@@ -75,6 +75,7 @@ class Graph:
         self._edges = {}
         self._available_node_id = 0
         self._available_edge_id = 0
+        self._global_attribute = GraphAttribute()
 
     def add_node(self, data, type=None):
         node = Node(data, type, self._available_node_id)
@@ -111,6 +112,10 @@ class Graph:
 
     def get_edge_by_id(self, id):
         return self._edges[id]
+
+    @property
+    def global_attribute(self):
+        return self._global_attribute
 
     def _check_graph_consistency(self):
         #TODO finish me
