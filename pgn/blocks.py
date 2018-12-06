@@ -1,9 +1,10 @@
 import copy
 
+from pgn.aggregators import MeanAggregator
 import torch.nn as nn
 
-class NodeBlock(nn.module):
-    def __init__(self, proj, upd, node_aggregator):
+class NodeBlock(nn.Module):
+    def __init__(self, proj, upd, node_aggregator=None):
         if type(proj) == dict:
             self.node_projectors = proj
         else:
@@ -13,7 +14,7 @@ class NodeBlock(nn.module):
             self._updaters = upd
         else:
             self._updaters = {None: upd}
-        self._node_aggregator = node_aggregator
+        self._node_aggregator = node_aggregator if node_aggregator is not None else MeanAggregator()
 
     def forward(self, G):
         updated_attrs = {}
@@ -28,7 +29,7 @@ class NodeBlock(nn.module):
         return updated_attrs
 
 
-class EdgeBlock(nn.module):
+class EdgeBlock(nn.Module):
     def __init__(self, upd):
         if type(upd) == dict:
             self._updaters = upd
@@ -45,12 +46,12 @@ class EdgeBlock(nn.module):
         return updated_attrs
 
 
-class GlobalBlock(nn.module):
-    def __init__(self, node_projectors, edge_projectors, node_aggregator, edge_aggregator, updater):
+class GlobalBlock(nn.Module):
+    def __init__(self, node_projectors, edge_projectors, updater, node_aggregator=None, edge_aggregator=None):
         self._node_projectors = node_projectors
         self._edge_projectors = edge_projectors
-        self._node_aggregator = node_aggregator
-        self._edge_aggregator = edge_aggregator
+        self._node_aggregator = node_aggregator if node_aggregator is None else MeanAggregator()
+        self._edge_aggregator = edge_aggregator if edge_aggregator is None else MeanAggregator()
         self._updater = updater
 
     def forward(self, G):
@@ -64,7 +65,7 @@ class GlobalBlock(nn.module):
         return self._updater(aggregated_edge_attrs, aggregated_node_attrs, G.global_attribute.data)
 
 
-class GraphNetwork(nn.module):
+class GraphNetwork(nn.Module):
     def __init__(self):
         self._global_block = GlobalBlock()
         self._node_block = NodeBlock()
