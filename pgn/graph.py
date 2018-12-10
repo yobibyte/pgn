@@ -21,6 +21,10 @@ class GraphAttribute:
     def data(self):
         return self._data
 
+    @data.setter
+    def data(self, val):
+        self._data = val
+
     @property
     def id(self):
         return self._id
@@ -28,6 +32,10 @@ class GraphAttribute:
     @id.setter
     def id(self, id):
         self._id = id
+
+    @property
+    def type(self):
+        return self._type
 
 class Edge(GraphAttribute):
     def __init__(self, sender, receiver, data=None, type=None, id=None):
@@ -116,6 +124,14 @@ class Graph:
     @property
     def global_attribute(self):
         return self._global_attribute
+
+    @property
+    def nodes(self):
+        return self._nodes
+
+    @property
+    def edges(self):
+        return self._edges
 
     def _check_graph_consistency(self):
         #TODO finish me

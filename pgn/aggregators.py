@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 #TODO ideally, we would like all our inputs to be in the form [batch, time, data_shape]
@@ -11,10 +12,13 @@ class Aggregator(nn.Module):
     """
 
     def forward(self, X):
-        raise NotImplementedError
+        if type(X) == list:
+            return torch.stack(X)
+        return X
 
 class MeanAggregator(Aggregator):
     def forward(self, X):
-        return X.mean(dim=1)
+        X = super().forward(X)
+        return X.mean(dim=0)
 
 
