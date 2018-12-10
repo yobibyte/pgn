@@ -4,12 +4,7 @@ from pgn.aggregators import MeanAggregator
 import torch.nn as nn
 
 class NodeBlock(nn.Module):
-    def __init__(self, proj, upd, node_aggregator=None):
-        if type(proj) == dict:
-            self.node_projectors = proj
-        else:
-            self.node_projectors = {None: proj}
-
+    def __init__(self, upd, node_aggregator=None):
         if type(upd) == dict:
             self._updaters = upd
         else:
@@ -20,7 +15,7 @@ class NodeBlock(nn.Module):
         updated_attrs = {}
 
         for n in G.nodes:
-            incoming_edge_attrs = {self.node_projectors[e.type](e.data) for e in n.incoming_edges}
+            incoming_edge_attrs = {e.data for e in n.incoming_edges}
             # Aggregate edge attributes per node
             aggregated = self._node_aggregator(incoming_edge_attrs)
             # Compute updated node attributes
@@ -47,19 +42,17 @@ class EdgeBlock(nn.Module):
 
 
 class GlobalBlock(nn.Module):
-    def __init__(self, node_projectors, edge_projectors, updater, node_aggregator=None, edge_aggregator=None):
-        self._node_projectors = node_projectors
-        self._edge_projectors = edge_projectors
+    def __init__(self, updater, node_aggregator=None, edge_aggregator=None):
         self._node_aggregator = node_aggregator if node_aggregator is None else MeanAggregator()
         self._edge_aggregator = edge_aggregator if edge_aggregator is None else MeanAggregator()
         self._updater = updater
 
     def forward(self, G):
         # Aggregate edge attributes globally
-        aggregated_edge_attrs = self._edge_aggregator({self._edge_projectors(e.data) for e in G.edges})
+        aggregated_edge_attrs = self._edge_aggregator({e.data for e in G.edges})
 
         # Aggregate node attributes globally
-        aggregated_node_attrs = self._node_aggregator({self._node_projectors(n.data) for n in G.nodes})
+        aggregated_node_attrs = self._node_aggregator({n.data for n in G.nodes})
 
         # Compute updated global attribute
         return self._updater(aggregated_edge_attrs, aggregated_node_attrs, G.global_attribute.data)
@@ -97,5 +90,4 @@ class GraphNetwork(nn.Module):
 
 
 #TODO implement batching
-#TODO None: projector/updater/aggregator by default, make access automatic
 #TODO should aggregators accept values? Or they might need receiver/sender indices? Not sure. Probably not
