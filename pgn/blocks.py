@@ -12,7 +12,7 @@ class Block(nn.Module):
 
 
 class NodeBlock(Block):
-    def __init__(self, updater, node_aggregator=None, independent=False):
+    def __init__(self, updater=None, node_aggregator=None, independent=False):
         super().__init__(independent)
         self._updater = updater
 
@@ -34,13 +34,16 @@ class NodeBlock(Block):
                 # Compute updated node attributes
                 to_updater.append(torch.cat([aggregated, n.data, G.global_attribute.data]))
 
-        updater_output = self._updater(torch.stack(to_updater))
+        if self._updater is None:
+            updater_output = to_updater
+        else:
+            updater_output = self._updater(torch.stack(to_updater))
 
         return {nid: out for nid, out in zip(G.nodes, updater_output)}
 
 
 class EdgeBlock(Block):
-    def __init__(self, updater, independent=False):
+    def __init__(self, updater=None, independent=False):
         super().__init__(independent)
         self._updater = updater
 
@@ -52,13 +55,17 @@ class EdgeBlock(Block):
             # TODO torch concat along axis 0? or 1?
             updater_input = [torch.cat([e.data, e.receiver.data, e.sender.data, G.global_attribute.data]) for e in G.edges.values()]
 
-        updater_output = self._updater(torch.stack(updater_input))
+        if self._updater is None:
+            updater_output = updater_input
+        else:
+            updater_output = self._updater(torch.stack(updater_input))
+
 
         return {nid: out for nid, out in zip(G.edges, updater_output)}
 
 
 class GlobalBlock(Block):
-    def __init__(self, updater, node_aggregator=None, edge_aggregator=None, independent=False):
+    def __init__(self, updater=None, node_aggregator=None, edge_aggregator=None, independent=False):
         super().__init__(independent)
 
         if independent:
@@ -85,7 +92,12 @@ class GlobalBlock(Block):
             upd_input.append(aggregated_node_attrs)
 
         # Compute updated global attribute
-        return self._updater(torch.cat(upd_input))
+        if self._updater is None:
+            updater_output = upd_input
+        else:
+            updater_output = self._updater(torch.cat(upd_input))
+
+        return updater_output
 
 
 class GraphNetwork(nn.Module):
