@@ -35,11 +35,8 @@ class NodeBlock(Block):
                 to_updater.append(torch.cat([aggregated, n.data, G.global_attribute.data]))
 
         updater_output = self._updater(torch.stack(to_updater))
-        updated_attrs = {}
-        for nid, out in zip(G.nodes, updater_output):
-            updated_attrs[nid] = out
 
-        return updated_attrs
+        return {nid: out for nid, out in zip(G.nodes, updater_output)}
 
 
 class EdgeBlock(Block):
@@ -48,16 +45,16 @@ class EdgeBlock(Block):
         self._updater = updater
 
     def forward(self, G):
-        updated_attrs = {}
 
-        for e in G.edges.values():
+        if self._independent:
+            updater_input = [e.data for e in G.edges.values()]
+        else:
             # TODO torch concat along axis 0? or 1?
-            if self._independent:
-                updated_attrs[e.id] = self._updater(e.data)
-            else:
-                updated_attrs[e.id] = self._updater(torch.cat([e.data, e.receiver.data, e.sender.data, G.global_attribute.data]))
+            updater_input = [torch.cat([e.data, e.receiver.data, e.sender.data, G.global_attribute.data]) for e in G.edges.values()]
 
-        return updated_attrs
+        updater_output = self._updater(torch.stack(updater_input))
+
+        return {nid: out for nid, out in zip(G.edges, updater_output)}
 
 
 class GlobalBlock(Block):
