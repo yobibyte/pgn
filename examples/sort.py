@@ -64,7 +64,7 @@ def create_target_graph(input_graph):
                 target_graph.add_edge(sid, rid, data=data)
     return target_graph
 
-N_EPOCHS = 100
+N_EPOCHS = 5000
 
 if __name__ == '__main__':
 
@@ -136,7 +136,7 @@ if __name__ == '__main__':
 
     # evaluate and plot
     mx = np.zeros((len(unsorted), len(unsorted)))
-    for e in target_graph.edges.values():
+    for e in g.edges.values():
         mx[e.sender.id][e.receiver.id] = e.data[0]
         #mx[e.receiver.id][e.sender.id] = e.data[0]
 
