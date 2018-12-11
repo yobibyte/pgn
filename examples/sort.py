@@ -86,21 +86,23 @@ if __name__ == '__main__':
 
     # build the GN
     edge_updater = nn.Sequential(
-        nn.Linear(input_edge_size + 2*input_node_size + input_global_size, 3),
+        nn.Linear(input_edge_size + 2*input_node_size + input_global_size, 10),
         nn.ReLU(),
-        nn.Linear(3, 2)
+        nn.Linear(10, 2),
+        nn.Softmax(),
     )
 
     node_updater = nn.Sequential(
-                       nn.Linear(input_edge_size + output_node_size + input_global_size, 3),
+                       nn.Linear(input_edge_size + output_node_size + input_global_size, 10),
                        nn.ReLU(),
-                       nn.Linear(3, 2)
+                       nn.Linear(10, 2),
+                       nn.Softmax(),
                    )
 
     global_updater = nn.Sequential(
         nn.Linear(output_edge_size + output_node_size + output_global_size, 3),
         nn.ReLU(),
-        nn.Linear(3, 1)
+        nn.Linear(3, 1),
     )
 
     input_g._global_attribute._data = torch.Tensor([0])
@@ -112,10 +114,9 @@ if __name__ == '__main__':
     gn = GraphNetwork(nb, eb, gb)
 
     criterion = nn.CrossEntropyLoss()
-    optimiser = torch.optim.Adam(lr=0.1, params=gn.parameters())
+    optimiser = torch.optim.Adam(lr=0.001, params=gn.parameters())
 
     # train
-
     for e in range(N_EPOCHS):
         optimiser.zero_grad()
         g = gn.forward(input_g)
@@ -129,15 +130,15 @@ if __name__ == '__main__':
         loss.backward()
 
         optimiser.step()
-        print("Epoch %d, training loss: %f." % (e, loss.item()))
-
+        if e % 100 == 0:
+            print("Epoch %d, training loss: %f." % (e, loss.item()))
 
 
     # evaluate and plot
     mx = np.zeros((len(unsorted), len(unsorted)))
-    for e in g.edges.values():
+    for e in target_graph.edges.values():
         mx[e.sender.id][e.receiver.id] = e.data[0]
-        mx[e.receiver.id][e.sender.id] = e.data[0]
+        #mx[e.receiver.id][e.sender.id] = e.data[0]
 
-    plt.imshow(mx)
+    plt.imshow(mx[np.argsort(unsorted)][:, np.argsort(unsorted)], cmap="viridis")
     plt.show()
