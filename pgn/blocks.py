@@ -48,7 +48,6 @@ class EdgeBlock(Block):
         self._updater = updater
 
     def forward(self, G):
-
         if self._independent:
             updater_input = [e.data for e in G.edges.values()]
         else:
@@ -59,7 +58,6 @@ class EdgeBlock(Block):
             updater_output = updater_input
         else:
             updater_output = self._updater(torch.stack(updater_input))
-
 
         return {nid: out for nid, out in zip(G.edges, updater_output)}
 
@@ -101,32 +99,34 @@ class GlobalBlock(Block):
 
 
 class GraphNetwork(nn.Module):
-    def __init__(self, node_block, edge_block, global_block):
+    def __init__(self, node_block=None, edge_block=None, global_block=None):
         super().__init__()
         self._node_block = node_block
         self._edge_block = edge_block
         self._global_block = global_block
 
     def forward(self, G):
-
-        G = copy.deepcopy(G)
+        #G = copy.deepcopy(G)
 
         # make one pass as in the original paper
 
         # 1. Compute updated edge attributes
-        updated_edges_attrs = self._edge_block(G)
-        for e, e_data in updated_edges_attrs.items():
-            G.edges[e].data = e_data
+        if self._edge_block is not None:
+            updated_edges_attrs = self._edge_block(G)
+            for e, e_data in updated_edges_attrs.items():
+                G.edges[e].data = e_data
 
         # 2. Aggregate edge attributes per node
         # 3. Compute updated node attributes
-        upd_node_attrs = self._node_block(G)
-        for n, n_data in upd_node_attrs.items():
-            G.nodes[n].data = n_data
+        if self._node_block is not None:
+            upd_node_attrs = self._node_block(G)
+            for n, n_data in upd_node_attrs.items():
+                G.nodes[n].data = n_data
 
         # # 4. Aggregate edge attributes globally
         # # 5. Aggregate node attributes globally
         # # 6. Compute updated global attribute
-        G.global_attribute.data = self._global_block(G)
+        if self._global_block is not None:
+            G.global_attribute.data = self._global_block(G)
 
         return G

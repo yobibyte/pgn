@@ -1,3 +1,6 @@
+import copy
+import torch
+
 class AttributeType:
     def __init__(self, name, type):
         self._name = name
@@ -148,3 +151,65 @@ class Graph:
 
         for e in self._edges.values():
             print("Edge with id: %d, data: %s, sender id: %d, receiver id: %d." % (e.id, e.data, e.sender.id, e.receiver.id))
+
+def concat_graphs(graph_list):
+    """
+    Concatenate features of the graphs with the same topology
+
+    Parameters
+    ----------
+    graph_list: list with pgn.graph.Graph entries
+
+    Returns
+    -------
+    A concatenated graph
+    """
+
+    if len(graph_list) == 0:
+        raise ValueError("Nothing to concatenate. Give me some graphs, man!")
+
+    if len(graph_list) > 1:
+        G = copy_graph(graph_list[0])
+
+        # concatenate nodes
+        for n in G.nodes:
+            # TODO cat or stack here?
+            G.nodes[n].data = torch.cat([g.nodes[n].data for g in graph_list])
+
+        # concatenate edges
+        for e in G.edges:
+            # TODO cat or stack here?
+            G.edges[e].data = torch.cat([g.edges[e].data for g in graph_list])
+        # concatenate globals
+        #TODO add to docs
+        #however if we just concatenate the values and node_updater is None, we will always increas the dimensionallity
+        #and we will be fucked in the recurremnt case
+        G.global_attribute.data = torch.cat([g.global_attribute.data for g in graph_list])
+
+        return G
+
+    return graph_list[0]
+
+
+def copy_graph(G):
+    #TODO check and recheck this
+    newG = Graph()
+
+    newG._nodes = {}
+    for nid, n in G.nodes.items():
+        new_node = Node(n.data.clone(), n.type, n.id)
+        newG._nodes[nid] = new_node
+
+    newG._edges = {}
+    for eid, e in G.edges.items():
+        new_edge = Edge(newG.get_node_by_id(e.sender.id), newG.get_node_by_id(e.receiver.id), e.data.clone(), e.type, e.id)
+        newG._nodes[e.sender.id].add_outcoming_edge(new_edge)
+        newG._nodes[e.receiver.id].add_incoming_edge(new_edge)
+        newG._edges[eid] = new_edge
+
+    ga = G._global_attribute
+    newG._global_attribute = GraphAttribute(ga.data.clone(), ga.type, ga.id)
+
+    newG._available_edge_id = G._available_edge_id
+    newG._available_node_id = G._available_node_id
+    return newG
