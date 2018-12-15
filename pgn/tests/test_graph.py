@@ -1,43 +1,37 @@
 import unittest
 
 from pgn import graph
+import torch
 
 class TestGraph(unittest.TestCase):
 
+    def setUp(self):
+        node_data = torch.Tensor([[0], [1]])
+        edges_data = torch.Tensor([[0], [1], [2]])
+        connectivity = [(0, 1), (0, 1), (1, 0)]
+        self.g = graph.Graph(node_data, edges_data, connectivity)
+
     def test_graph_build(self):
-        g = graph.Graph()
-        nid1 = g.add_node('First')
-        nid2 = g.add_node('Second')
-        eid1 = g.add_edge(nid1, nid2, 'first connector')
-        eid2 = g.add_edge(nid1, nid2, 'second connector')
-        eid3 = g.add_edge(nid2, nid1, 'third connector')
 
-        n1 = g.get_node_by_id(nid1)
-        n2 = g.get_node_by_id(nid2)
+        self.assertEqual(self.g.nodes_data[0], 0)
+        self.assertEqual(self.g.nodes_data[1], 1)
 
-        e1 = g.get_edge_by_id(eid1)
-        e2 = g.get_edge_by_id(eid2)
-        e3 = g.get_edge_by_id(eid3)
+        self.assertEqual(self.g.edges_data[0], 0)
+        self.assertEqual(self.g.edges_data[1], 1)
+        self.assertEqual(self.g.edges_data[2], 2)
 
-        self.assertEqual(n1.data, 'First')
-        self.assertEqual(n2.data, 'Second')
+        self.assertEqual(set(self.g.incoming[0]), {2})
+        self.assertEqual(set(self.g.outgoing[0]), {0, 1})
 
-        self.assertEqual(e1.data, 'first connector')
-        self.assertEqual(e2.data, 'second connector')
-        self.assertEqual(e3.data, 'third connector')
+        self.assertEqual(set(self.g.incoming[1]), {0, 1})
+        self.assertEqual(set(self.g.outgoing[1]), {2})
 
-        self.assertEqual(set(n1.incoming_edges.values()), {e3})
-        self.assertEqual(set(n1.outcoming_edges.values()), {e1, e2})
-
-        self.assertEqual(set(n2.incoming_edges.values()), {e1, e2})
-        self.assertEqual(set(n2.outcoming_edges.values()), {e3})
-
-        self.assertEqual(e1.sender.id, nid1)
-        self.assertEqual(e1.receiver.id, nid2)
-        self.assertEqual(e2.sender.id, nid1)
-        self.assertEqual(e2.receiver.id, nid2)
-        self.assertEqual(e3.sender.id, nid2)
-        self.assertEqual(e3.receiver.id, nid1)
+        self.assertEqual(self.g.senders[0], 0)
+        self.assertEqual(self.g.receivers[0], 1)
+        self.assertEqual(self.g.senders[1], 0)
+        self.assertEqual(self.g.receivers[2], 1)
+        self.assertEqual(self.g.senders[2], 1)
+        self.assertEqual(self.g.receivers[2], 0)
 
         g._graph_summary()
 

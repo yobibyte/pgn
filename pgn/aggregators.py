@@ -19,6 +19,6 @@ class Aggregator(nn.Module):
 class MeanAggregator(Aggregator):
     def forward(self, X):
         X = super().forward(X)
-        return X.mean(dim=0)
+        return X.mean(dim=1)
 
 

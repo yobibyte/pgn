@@ -1,156 +1,156 @@
-import copy
 import torch
 
-class AttributeType:
-    def __init__(self, name, type):
-        self._name = name
-        self._type = type
+class Graph(object):
+
+
+    def __init__(self, nodes_data=None, edges_data=None, global_data=None, connectivity=None, nodes_types=None, edges_types=None):
+        """
+
+        Parameters
+        ----------
+        nodes_data torch.Tensor of dimensionality (n_nodes, nodes_feature_dim)
+        edges_data torch.Tensor of dimensionality (n_edges, edges_feature_dim, can be None if no edges in the graph
+        connectivity list of two-el tuples where 0-th el is the edge sender and 1-th is the edge receiver
+        index of an element correspond to its index in the edges_data tensor
+        nodes_types: list of types of the nodes
+        edges_types: list of types of the edges
+        """
+
+        self._nodes_data = nodes_data
+        self._edges_data = edges_data
+        self.global_data = global_data
+
+        if nodes_types is not None and len(nodes_types) != self.num_nodes:
+            raise ValueError(
+                "The length of nodes_types list should be the same as the first dimension of nodes_data")
+
+        if self._edges_data is None and connectivity is not None:
+            raise ValueError("You specify connectivity for the edges, but provide no data for them")
+
+        if self._edges_data is not None:
+
+            if connectivity is None:
+                raise ValueError("All edges should have senders/receivers.")
+
+            if len(connectivity) != self.num_edges:
+                raise ValueError(
+                    "The length of edges_connectivity list should be the same as the first dimension of edges_data")
+
+            if (edges_types is not None) and (len(edges_types) != self.num_edges):
+                raise ValueError(
+                    "The length of edges_types list should be the same as the first dimension of edges_data")
+
+            for s, r in connectivity:
+                if s not in range(self.num_nodes):
+                    raise ValueError(
+                        "Sender %d is invalid. It's either its id is negative or bigger then number of your nodes. " % s)
+                if r not in range(self.num_nodes):
+                    raise ValueError(
+                        "Receiver %d is invalid. It's either its id is negative or bigger then number of your nodes. " % r)
+
+            self._edges_info = [{'connectivity': (conn[0], conn[1]),
+                                 'type': None if edges_types is None else edges_types[eid]}
+                                for eid, conn in enumerate(connectivity)]
+
+            if edges_types is not None:
+                for idx, t in enumerate(edges_types):
+                    self._edges_info[idx]['type'] = t
+
+        if nodes_data is not None:
+            self._nodes_info = [
+                {'incoming': [] if edges_data is None else [eid for eid, einfo in enumerate(self._edges_info) if einfo['connectivity'][1] == nid],
+                 'outgoing': [] if edges_data is None else [eid for eid, einfo in enumerate(self._edges_info) if einfo['connectivity'][0] == nid],
+                 'type': None if nodes_types is None else nodes_types[nid]
+                 }
+                for nid in range(self.num_nodes)]
 
     @property
-    def name(self):
-        return self._name
+    def nodes_data(self):
+        return self._nodes_data
+
+    @nodes_data.setter
+    def nodes_data(self, nodes_data=None):
+        #TODO check cosistency after modifications everywhere
+        self._nodes_data = nodes_data
 
     @property
-    def type(self):
-        return self._type
+    def edges_data(self):
+        return self._edges_data
 
-class GraphAttribute:
-    def __init__(self, data=None, type=None, id=None):
-        self._data = data
-        self._type = type
-        self._id = id
-
-    @property
-    def data(self):
-        return self._data
-
-    @data.setter
-    def data(self, val):
-        self._data = val
+    @edges_data.setter
+    def edges_data(self, edges_data=None):
+        # TODO check cosistency after modifications everywhere
+        self._edges_data = edges_data
 
     @property
-    def id(self):
-        return self._id
+    def global_data(self):
+        return self._global_data
 
-    @id.setter
-    def id(self, id):
-        self._id = id
-
-    @property
-    def type(self):
-        return self._type
-
-class Edge(GraphAttribute):
-    def __init__(self, sender, receiver, data=None, type=None, id=None):
-        self._sender = sender
-        self._receiver = receiver
-        super().__init__(data, type, id)
+    @global_data.setter
+    def global_data(self, global_data=None):
+        self._global_data = global_data
 
     @property
-    def sender(self):
-        return self._sender
+    def num_nodes(self):
+        return self._nodes_data.shape[0]
 
     @property
-    def receiver(self):
-        return self._receiver
-
-class Node(GraphAttribute):
-    def __init__(self, data=None, type=None, id=None):
-        super().__init__(data, type, id)
-        self._incoming_edges = {}
-        self._outcoming_edges = {}
+    def num_edges(self):
+        return self._edges_data.shape[0]
 
     @property
-    def incoming_edges(self):
-        return self._incoming_edges
+    def edges_types(self):
+        return [e['type'] for e in self._edges_info]
 
     @property
-    def outcoming_edges(self):
-        return self._outcoming_edges
-
-    def add_incoming_edge(self, edge):
-        self._incoming_edges[edge.id] = edge
-
-    def add_outcoming_edge(self, edge):
-        self._outcoming_edges[edge.id] = edge
-
-    def remove_incoming_edge(self, edge_id):
-        del self._incoming_edges[edge_id]
-
-    def remove_outcoming_edge(self, edge_id):
-        del self._outcoming_edges[edge_id]
-
-class Graph:
-    def __init__(self):
-        self._nodes = {}
-        self._edges = {}
-        self._available_node_id = 0
-        self._available_edge_id = 0
-        self._global_attribute = GraphAttribute()
-
-    def add_node(self, data, type=None):
-        node = Node(data, type, self._available_node_id)
-        self._nodes[node.id] = node
-        self._available_node_id += 1
-        return node.id
-
-    def add_edge(self, sender_id, receiver_id, data=None, type=None):
-        edge = Edge(self._nodes[sender_id], self._nodes[receiver_id], data, type, self._available_edge_id)
-        self._edges[edge.id] = edge
-        self._nodes[sender_id].add_outcoming_edge(edge)
-        self._nodes[receiver_id].add_incoming_edge(edge)
-        self._available_edge_id+=1
-        return edge.id
-
-    def remove_edge(self, id):
-        # clean sender/receiver first
-        self._edges[id].sender.remove_outcoming_edge(id)
-        self._edges[id].receiver.remove_incoming_edge(id)
-        # now we can safely remove the edge
-        del self._edges[id]
-
-    def remove_node(self, id):
-        # remove all edges first
-        edges_to_remove = [e.id for e in self._edges.values() if e.sender == id or e.receiver == id]
-        for idx in edges_to_remove:
-            del self._edges[idx]
-
-        # remove node itself
-        del self._nodes[id]
-
-    def get_node_by_id(self, id):
-        return self._nodes[id]
-
-    def get_edge_by_id(self, id):
-        return self._edges[id]
+    def nodes_types(self):
+        return [n['type'] for n in self._nodes_info]
 
     @property
-    def global_attribute(self):
-        return self._global_attribute
+    def connectivity(self):
+        return [(e['connectivity'][0], e['connectivity'][1]) for e in self._edges_info]
 
     @property
-    def nodes(self):
-        return self._nodes
+    def senders(self):
+        return [e['connectivity'][0] for e in self._edges_info]
 
     @property
-    def edges(self):
-        return self._edges
+    def receivers(self):
+        return [e['connectivity'][1] for e in self._edges_info]
 
-    def _check_graph_consistency(self):
-        #TODO finish me
-        # every edge should connect on
-        raise NotImplementedError
+    @property
+    def incoming(self):
+        return [n['incoming'] for n in self._nodes_info]
 
-    def _get_ajacency_matrix(self):
-        # TODO finish me
-        raise NotImplementedError
+    @property
+    def outgoing(self):
+        return [n['outgoing'] for n in self._nodes_info]
+
+    def identify_edge_by_sender_and_receiver(self, sender_id, receiver_id):
+        if sender_id > self.num_edges - 1 or receiver_id > self.num_edges -1:
+            return -1
+
+        conn = self.connectivity
+        for eid in range(self.num_edges):
+            if conn[eid][0] == sender_id and conn[eid][1] == receiver_id:
+                return eid
+
+        return -1
 
     def _graph_summary(self):
-        for n in self._nodes.values():
-            print("Node with id: %d, data: %s, incoming edges: %s, outcoming edges: %s" % (n.id, str(n.data), n.incoming_edges, n.outcoming_edges))
+        for nid, ninfo in enumerate(self._nodes_info):
+            print("Node with id: %d, data: %s, incoming edges: %s, outcoming edges: %s" %
+                  (nid, str(self._nodes_data[nid]), ninfo['incoming'], ninfo['outgoing']))
 
-        for e in self._edges.values():
-            print("Edge with id: %d, data: %s, sender id: %d, receiver id: %d." % (e.id, e.data, e.sender.id, e.receiver.id))
+        for eid, einfo in self._edges_info:
+            print("Edge with id: %d, data: %s, sender id: %d, receiver id: %d." %
+                  (eid, self._edges_data[eid], einfo['connectivity'][0], einfo['connectivity'][1]))
+
+def copy_graph_topology(G):
+    nodes_data = torch.zeros_like(G.nodes_data)
+    edges_data = torch.zeros_like(G.edges_data)
+    global_data = torch.zeros_like(G.global_data)
+    return Graph(nodes_data, edges_data, global_data, G.connectivity, G.nodes_types, G.edges_types)
 
 def concat_graphs(graph_list):
     """
@@ -168,48 +168,21 @@ def concat_graphs(graph_list):
     if len(graph_list) == 0:
         raise ValueError("Nothing to concatenate. Give me some graphs, man!")
 
-    if len(graph_list) > 1:
-        G = copy_graph(graph_list[0])
+    if len(graph_list) == 1:
+        return graph_list[0]
 
-        # concatenate nodes
-        for n in G.nodes:
-            # TODO cat or stack here?
-            G.nodes[n].data = torch.cat([g.nodes[n].data for g in graph_list])
-
-        # concatenate edges
-        for e in G.edges:
-            # TODO cat or stack here?
-            G.edges[e].data = torch.cat([g.edges[e].data for g in graph_list])
-        # concatenate globals
-        #TODO add to docs
-        #however if we just concatenate the values and node_updater is None, we will always increas the dimensionallity
-        #and we will be fucked in the recurremnt case
-        G.global_attribute.data = torch.cat([g.global_attribute.data for g in graph_list])
-
-        return G
-
-    return graph_list[0]
+    # TODO check that topology is the same for everyone
+    res = copy_graph_topology(graph_list[0])
+    res._nodes_data = torch.cat([g._nodes_data for g in graph_list], dim=1)
+    res._edges_data = torch.cat([g._edges_data for g in graph_list], dim=1)
+    res._global_data = torch.cat([g._global_data for g in graph_list])
+    return res
 
 
 def copy_graph(G):
-    #TODO check and recheck this
-    newG = Graph()
-
-    newG._nodes = {}
-    for nid, n in G.nodes.items():
-        new_node = Node(n.data.clone(), n.type, n.id)
-        newG._nodes[nid] = new_node
-
-    newG._edges = {}
-    for eid, e in G.edges.items():
-        new_edge = Edge(newG.get_node_by_id(e.sender.id), newG.get_node_by_id(e.receiver.id), e.data.clone(), e.type, e.id)
-        newG._nodes[e.sender.id].add_outcoming_edge(new_edge)
-        newG._nodes[e.receiver.id].add_incoming_edge(new_edge)
-        newG._edges[eid] = new_edge
-
-    ga = G._global_attribute
-    newG._global_attribute = GraphAttribute(ga.data.clone(), ga.type, ga.id)
-
-    newG._available_edge_id = G._available_edge_id
-    newG._available_node_id = G._available_node_id
-    return newG
+    return Graph(G._nodes_data.clone(),
+                 G._edges_data.clone(),
+                 G._global_data.clone(),
+                 G.connectivity,
+                 G.nodes_types,
+                 G.edges_types)

@@ -1,9 +1,9 @@
-import copy
-
 from pgn.aggregators import MeanAggregator
 
 import torch
 import torch.nn as nn
+
+from pgn.graph import copy_graph
 
 class Block(nn.Module):
     def __init__(self, independent):
@@ -25,22 +25,16 @@ class NodeBlock(Block):
 
     def forward(self, G):
         if self._independent:
-            to_updater = [n.data for n in G.nodes.values()]
+            to_updater = G.nodes_data
         else:
-            to_updater = []
-            for n in G.nodes.values():
-                # Aggregate edge attributes per node
-                aggregated = self._node_aggregator(torch.stack([e.data for e in n.incoming_edges.values()]))
-                # Compute updated node attributes
-                to_updater.append(torch.cat([aggregated, n.data, G.global_attribute.data]))
+            agg_input = [G.edges_data[G.incoming[nid]] for nid in range(G.num_nodes)]
+            aggregated = self._node_aggregator(agg_input)
+            to_updater = torch.stack([torch.cat([aggregated[nid], G.nodes_data[nid], G.global_data]) for nid in range(G.num_nodes)])
 
         if self._updater is None:
-            updater_output = to_updater
+            return to_updater
         else:
-            updater_output = self._updater(torch.stack(to_updater))
-
-        return {nid: out for nid, out in zip(G.nodes, updater_output)}
-
+            return self._updater(to_updater)
 
 class EdgeBlock(Block):
     def __init__(self, updater=None, independent=False):
@@ -48,18 +42,20 @@ class EdgeBlock(Block):
         self._updater = updater
 
     def forward(self, G):
+
         if self._independent:
-            updater_input = [e.data for e in G.edges.values()]
+            updater_input = G.edges_data
         else:
             # TODO torch concat along axis 0? or 1?
-            updater_input = [torch.cat([e.data, e.receiver.data, e.sender.data, G.global_attribute.data]) for e in G.edges.values()]
+            # TODO  pad till largest here
+
+            inpt = [torch.cat([G.edges_data[e], G.nodes_data[G.receivers[e]], G.nodes_data[G.senders[e]], G.global_data]) for e in range(G.num_edges)]
+            updater_input = torch.stack(inpt)
 
         if self._updater is None:
-            updater_output = updater_input
+            return updater_input
         else:
-            updater_output = self._updater(torch.stack(updater_input))
-
-        return {nid: out for nid, out in zip(G.edges, updater_output)}
+            return self._updater(updater_input)
 
 
 class GlobalBlock(Block):
@@ -77,25 +73,18 @@ class GlobalBlock(Block):
         self._updater = updater
 
     def forward(self, G):
+        if self._updater is None:
+            return G.global_data
 
-        upd_input = [G.global_attribute.data]
-
+        upd_input = [G.global_data]
         if not self._independent:
             # Aggregate edge attributes globally
-            aggregated_edge_attrs = self._edge_aggregator([e.data for e in G.edges.values()])
-            upd_input.append(aggregated_edge_attrs)
+            upd_input.append(self._edge_aggregator([G.edges_data]).squeeze())
 
             # Aggregate node attributes globally
-            aggregated_node_attrs = self._node_aggregator([n.data for n in G.nodes.values()])
-            upd_input.append(aggregated_node_attrs)
+            upd_input.append(self._node_aggregator([G.nodes_data]).squeeze())
 
-        # Compute updated global attribute
-        if self._updater is None:
-            updater_output = upd_input
-        else:
-            updater_output = self._updater(torch.cat(upd_input))
-
-        return updater_output
+        return self._updater(torch.cat(upd_input))
 
 
 class GraphNetwork(nn.Module):
@@ -105,28 +94,25 @@ class GraphNetwork(nn.Module):
         self._edge_block = edge_block
         self._global_block = global_block
 
-    def forward(self, G):
-        #G = copy.deepcopy(G)
+    def forward(self, G, modify_input=False):
+        if not modify_input:
+            G = copy_graph(G)
 
         # make one pass as in the original paper
 
         # 1. Compute updated edge attributes
         if self._edge_block is not None:
-            updated_edges_attrs = self._edge_block(G)
-            for e, e_data in updated_edges_attrs.items():
-                G.edges[e].data = e_data
+            G.edges_data = self._edge_block(G)
 
         # 2. Aggregate edge attributes per node
         # 3. Compute updated node attributes
         if self._node_block is not None:
-            upd_node_attrs = self._node_block(G)
-            for n, n_data in upd_node_attrs.items():
-                G.nodes[n].data = n_data
+            G.nodes_data = self._node_block(G)
 
         # # 4. Aggregate edge attributes globally
         # # 5. Aggregate node attributes globally
         # # 6. Compute updated global attribute
         if self._global_block is not None:
-            G.global_attribute.data = self._global_block(G)
+            G.global_data = self._global_block(G)
 
         return G
