@@ -11,6 +11,8 @@ import torch.nn as nn
 from pgn.graph import Graph, concat_graphs, copy_graph, copy_graph_topology
 from pgn.blocks import NodeBlock, EdgeBlock, GlobalBlock, GraphNetwork
 
+import argparse
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -29,7 +31,8 @@ def graph_from_list(input_list):
     connectivity = [el for el in itertools.product(range(len(input_list)), repeat=2) if el[0] != el[1]]
     return Graph(nodes_data=torch.Tensor([[v] for v in input_list]),
                  edges_data=torch.zeros(len(connectivity), 1),
-                 connectivity=connectivity
+                 connectivity=connectivity,
+                 global_data=torch.Tensor([0])
                  )
 
 
@@ -93,16 +96,61 @@ def get_mlp_updaters(input_node_size,
         global_updater = get_mlp(input_global_size + output_edge_size + output_node_size, [16, output_global_size])
     return node_updater, edge_updater, global_updater
 
+def forward(input_g, encoder, core, decoder, core_steps):
+    input_copy = copy_graph(input_g)
+    latent = encoder(input_copy)
+    latent0 = copy_graph(latent)
+
+    output = []
+    for s in range(core_steps):
+        concatenated = concat_graphs([latent0, latent])
+        latent = core(concatenated)
+        output.append(decoder(latent))
+
+    return output
+
+def generate_graph_batch(n_examples, sample_length, target=True):
+    input_graphs = [graph_from_list(np.random.uniform(size=sample_length)) for _ in range(n_examples)]
+    target_graphs = [create_target_graph(g) for g in input_graphs] if target else None
+    if target_graphs is not None:
+        return input_graphs, target_graphs
+    else:
+        return input_graphs
+
+def process_batch(encoder, core, decoder, core_steps, input_graphs, target_graphs, compute_grad=True):
+    if not compute_grad:
+        encoder.eval()
+        core.eval()
+        decoder.eval()
+
+    node_loss = 0
+    edge_loss = 0
+    for input_g, target_g in zip(input_graphs, target_graphs):
+        g_out = forward(input_g, encoder, core, decoder, core_steps)
+        node_loss += sum([criterion(g.nodes_data, target_g.nodes_data) for g in g_out])
+        edge_loss += sum([criterion(g.edges_data, target_g.edges_data) for g in g_out])
+    loss = node_loss + edge_loss
+
+    if not compute_grad:
+        encoder.train()
+        core.train()
+        decoder.train()
+    return loss
+
 if __name__ == '__main__':
 
-    # build the graph
-    unsorted = np.random.uniform(size=5)
-    input_g = graph_from_list(unsorted)
-    input_g.global_data = torch.Tensor([0])
+    parser = argparse.ArgumentParser(description='Sorting with graph networks')
+    parser.add_argument('--num-train', type=int, default=10, help='number of training examples')
+    parser.add_argument('--num-eval', type=int, default=10, help='number of evaluation examples')
+    parser.add_argument('--epochs', type=int, default=5000, help='number of training epochs')
+    parser.add_argument('--core-steps', type=int, default=10, help='number of core processing steps')
+    parser.add_argument('--sample-length', type=int, default=10, help='number of elements in the list to sort')
+    parser.add_argument('--eval-freq', type=int, default=100, help='Evaluation/logging frequency')
+    args = parser.parse_args()
 
-    target_graph = create_target_graph(input_g)
-    _, target_nodes = target_graph.nodes_data.max(dim=1)
-    _, target_edges = target_graph.edges_data.max(dim=1)
+    train_input_graphs, train_target_graphs = generate_graph_batch(args.num_train, sample_length=args.sample_length)
+    eval_input_graphs, eval_target_graphs = generate_graph_batch(args.num_train, sample_length=args.sample_length)
+
 
     enc_node_updater, enc_edge_updater, enc_global_updater = get_mlp_updaters(1, 1, 1, 16, 16, 16, independent=True)
     encoder = GraphNetwork(NodeBlock(enc_node_updater, independent=True),
@@ -119,42 +167,34 @@ if __name__ == '__main__':
                            EdgeBlock(nn.Sequential(dec_edge_updater, nn.Linear(16, 2)), independent=True),
                            GlobalBlock(nn.Sequential(dec_global_updater, nn.Linear(16, 2)), independent=True),
                            )
-    N_EPOCHS = 5000
-    NUM_PROCESSING_STEPS = 5
-    models = [encoder] + [core] * NUM_PROCESSING_STEPS + [decoder]
+    models = [encoder] + [core] * args.core_steps + [decoder]
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCEWithLogitsLoss()
     parameters = list(encoder.parameters())+list(core.parameters())+list(decoder.parameters())
     optimiser = torch.optim.Adam(lr=0.001, params=parameters)
 
     # train
-    for e in range(N_EPOCHS):
+    for e in range(args.epochs):
         optimiser.zero_grad()
-
-        input_copy = copy_graph(input_g)
-        latent = encoder(input_copy)
-        latent0 = copy_graph(latent)
-
-        for s in range(NUM_PROCESSING_STEPS):
-            concatenated = concat_graphs([latent0, latent])
-            latent = core(concatenated)
-
-        g = decoder(latent)
-
-        node_loss = criterion(g.nodes_data, target_nodes)
-        edge_loss = criterion(g.edges_data, target_edges)
-
-        loss = node_loss + edge_loss
-        loss.backward()
-
+        train_loss = process_batch(encoder, core, decoder, args.core_steps, train_input_graphs, train_target_graphs)
+        train_loss.backward()
         optimiser.step()
-        if e % 100 == 0:
-            print("Epoch %d, training loss: %f." % (e, loss.item()))
+        if e % args.eval_freq == 0 or e == args.epochs-1:
+            eval_loss = process_batch(encoder, core, decoder, args.core_steps, eval_input_graphs, eval_target_graphs,
+                                      compute_grad=False)
+            print("Epoch %d, mean training loss: %f, mean evaluation loss: %f."
+                  % (e, train_loss.item()/args.num_train, eval_loss.item()/args.num_train))
+
+    unsorted = np.random.uniform(size=args.sample_length)
+    test_g = graph_from_list(unsorted)
+    test_g.global_data = torch.Tensor([0])
+    g = forward(test_g, encoder, core, decoder, args.core_steps)[-1]
 
     # evaluate and plot
     mx = np.zeros((len(unsorted), len(unsorted)))
     for eid in range(g.num_edges):
         mx[g.senders[eid]][g.receivers[eid]] = g.edges_data[eid, 0]
     sort_indices = np.argsort(unsorted)
-    plt.imshow(mx[sort_indices][:, sort_indices], cmap="viridis")
+    plt.matshow(mx[sort_indices][:, sort_indices], cmap="viridis")
+    plt.grid(False)
     plt.show()
