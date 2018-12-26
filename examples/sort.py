@@ -55,14 +55,13 @@ def create_target_graph(input_graph):
 
     for sidx, sid in enumerate(sorted_ids):
         for ridx, rid in enumerate(sorted_ids):
-            if sid != rid:
-                # get edge id by sid and rid
-                eid = input_graph.identify_edge_by_sender_and_receiver(sid, rid)
-                # we look for exact comparison here since we sort
-                if (sidx < len(sorted_ids) - 1 and ridx == sidx + 1):
-                    data[eid][0] = 1.0
-                else:
-                    data[eid][1] = 1.0
+            # get edge id by sid and rid
+            eid = input_graph.identify_edge_by_sender_and_receiver(sid, rid)
+            # we look for exact comparison here since we sort
+            if (sidx < len(sorted_ids) - 1 and ridx == sidx + 1):
+                data[eid][0] = 1.0
+            else:
+                data[eid][1] = 1.0
     target_graph.edges_data = data
 
     return target_graph
