@@ -142,7 +142,7 @@ class Graph(object):
             print("Node with id: %d, data: %s, incoming edges: %s, outcoming edges: %s" %
                   (nid, str(self._nodes_data[nid]), ninfo['incoming'], ninfo['outgoing']))
 
-        for eid, einfo in self._edges_info:
+        for eid, einfo in enumerate(self._edges_info):
             print("Edge with id: %d, data: %s, sender id: %d, receiver id: %d." %
                   (eid, self._edges_data[eid], einfo['connectivity'][0], einfo['connectivity'][1]))
 
