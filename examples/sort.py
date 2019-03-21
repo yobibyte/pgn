@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 
 from pgn.graph import Graph, concat_graphs, copy_graph, copy_graph_topology
-from pgn.blocks import NodeBlock, EdgeBlock, GlobalBlock, GraphNetwork
+from pgn.blocks import NodeBlock, EdgeBlock, GlobalBlock, GraphNetwork, IndependenceMode, NodeIndependenceMode
 
 import argparse
 
@@ -84,12 +84,13 @@ def get_mlp_updaters(input_node_size,
              output_node_size,
              output_edge_size,
              output_global_size,
-             independent):
-    if independent:
+             independence_mode):
+    if independence_mode==IndependenceMode.INDEPENDENT:
         edge_updater = get_mlp(input_edge_size, [16, output_edge_size])
         node_updater = get_mlp(input_node_size, [16, output_node_size])
         global_updater = get_mlp(input_global_size, [16, output_global_size])
     else:
+        # no aggregation of the outgoing for this example
         edge_updater = get_mlp(input_edge_size + 2*input_node_size + input_global_size, [16, output_edge_size])
         node_updater = get_mlp(input_node_size + output_edge_size + input_global_size, [16, output_node_size])
         global_updater = get_mlp(input_global_size + output_edge_size + output_node_size, [16, output_global_size])
@@ -151,20 +152,20 @@ if __name__ == '__main__':
     eval_input_graphs, eval_target_graphs = generate_graph_batch(args.num_train, sample_length=args.sample_length)
 
 
-    enc_node_updater, enc_edge_updater, enc_global_updater = get_mlp_updaters(1, 1, 1, 16, 16, 16, independent=True)
-    encoder = GraphNetwork(NodeBlock(enc_node_updater, independent=True),
-                           EdgeBlock(enc_edge_updater, independent=True),
-                           GlobalBlock(enc_global_updater, independent=True))
+    enc_node_updater, enc_edge_updater, enc_global_updater = get_mlp_updaters(1, 1, 1, 16, 16, 16, independence_mode=IndependenceMode.INDEPENDENT)
+    encoder = GraphNetwork(NodeBlock(enc_node_updater, independence_mode=NodeIndependenceMode.INDEPENDENT),
+                           EdgeBlock(enc_edge_updater, independence_mode=IndependenceMode.INDEPENDENT),
+                           GlobalBlock(enc_global_updater, independence_mode=IndependenceMode.INDEPENDENT))
 
-    core_node_updater, core_edge_updater, core_global_updater = get_mlp_updaters(32, 32, 32, 16, 16, 16, independent=False)
+    core_node_updater, core_edge_updater, core_global_updater = get_mlp_updaters(32, 32, 32, 16, 16, 16, independence_mode=IndependenceMode.DEPENDENT)
     core = GraphNetwork(NodeBlock(core_node_updater),
                         EdgeBlock(core_edge_updater),
                         GlobalBlock(core_global_updater))
 
-    dec_node_updater, dec_edge_updater, dec_global_updater = get_mlp_updaters(16, 16, 16, 16, 16, 16, independent=True)
-    decoder = GraphNetwork(NodeBlock(nn.Sequential(dec_node_updater, nn.Linear(16, 2)), independent=True),
-                           EdgeBlock(nn.Sequential(dec_edge_updater, nn.Linear(16, 2)), independent=True),
-                           GlobalBlock(nn.Sequential(dec_global_updater, nn.Linear(16, 2)), independent=True),
+    dec_node_updater, dec_edge_updater, dec_global_updater = get_mlp_updaters(16, 16, 16, 16, 16, 16, independence_mode=IndependenceMode.INDEPENDENT)
+    decoder = GraphNetwork(NodeBlock(nn.Sequential(dec_node_updater, nn.Linear(16, 2)), independence_mode=NodeIndependenceMode.INDEPENDENT),
+                           EdgeBlock(nn.Sequential(dec_edge_updater, nn.Linear(16, 2)), independence_mode=IndependenceMode.INDEPENDENT),
+                           GlobalBlock(nn.Sequential(dec_global_updater, nn.Linear(16, 2)), independence_mode=IndependenceMode.INDEPENDENT),
                            )
     models = [encoder] + [core] * args.core_steps + [decoder]
 

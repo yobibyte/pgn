@@ -7,16 +7,16 @@ from pgn.graph import copy_graph
 
 from enum import IntEnum, unique
 @unique
-class IndependenceMode(IntEnum):
-    # 0 do not aggregate
-    # 1 aggregate incoming only
-    # 2 aggregate outgoing only
-    # 3 aggregate incoming and outgoing
-
+class NodeIndependenceMode(IntEnum):
     INDEPENDENT = 0
     AGGREGATE_INCOMING = 1
     AGGREGATE_OUTGOING = 2
+    AGGREGATE_BOTH = 3
 
+@unique
+class IndependenceMode(IntEnum):
+    INDEPENDENT = 0
+    DEPENDENT = 1
 
 class Block(nn.Module):
     def __init__(self, independence_mode):
@@ -25,39 +25,38 @@ class Block(nn.Module):
 
 
 class NodeBlock(Block):
-    def __init__(self, updater=None, in_e2n_aggregator=None, out_e2n_aggregator=None, independence_mode=1):
+    def __init__(self, updater=None, in_e2n_aggregator=None, out_e2n_aggregator=None, independence_mode=NodeIndependenceMode.AGGREGATE_INCOMING):
         super().__init__(independence_mode)
         self._updater = updater
 
-        if independence_mode == IndependenceMode.INDEPENDENT:
+        if independence_mode == NodeIndependenceMode.INDEPENDENT:
             if in_e2n_aggregator is not None or out_e2n_aggregator is not None:
                 raise ValueError("`Independence mode` is set to INDEPENDENT, but you're passing an aggregator. Is something wrong?")
         else:
-            if IndependenceMode.AGGREGATE_INCOMING & independence_mode:
+            if NodeIndependenceMode.AGGREGATE_INCOMING & independence_mode:
                 self._in_e2n_aggregator = MeanAggregator() if in_e2n_aggregator is None else in_e2n_aggregator
             elif in_e2n_aggregator is not None:
                 raise ValueError("`Independence mode` is set to not aggregate incoming, but you're passing an aggregator. Is something wrong?")
-            if IndependenceMode.AGGREGATE_OUTGOING & independence_mode:
+            if NodeIndependenceMode.AGGREGATE_OUTGOING & independence_mode:
                 self._out_e2n_aggregator = MeanAggregator() if out_e2n_aggregator is None else out_e2n_aggregator
             elif in_e2n_aggregator is not None:
                 raise ValueError(
                     "`Independence mode` is set to not aggregate outgoing, but you're passing an aggregator. Is something wrong?")
 
     def forward(self, G):
-        if self._independence_mode == IndependenceMode.INDEPENDENT:
+        if self._independence_mode == NodeIndependenceMode.INDEPENDENT:
             to_updater = G.nodes_data
         else:
             aggregated = []
-            if IndependenceMode.AGGREGATE_INCOMING & self._independence_mode:
+            if NodeIndependenceMode.AGGREGATE_INCOMING & self._independence_mode:
                 agg_input = [G.edges_data[G.incoming[nid]] for nid in range(G.num_nodes)]
                 aggregated.append(self._in_e2n_aggregator(agg_input))
 
-            if IndependenceMode.AGGREGATE_OUTGOING & self._independence_mode:
+            if NodeIndependenceMode.AGGREGATE_OUTGOING & self._independence_mode:
                 agg_input = [G.edges_data[G.outgoing[nid]] for nid in range(G.num_nodes)]
                 aggregated.append(self._out_e2n_aggregator(agg_input))
-            aggregated = torch.stack(aggregated)
+            aggregated = torch.cat(aggregated, dim=1) # TODO check if the dims are correct in the batch scenario
 
-            # TODO write a unit test to check if the concatenation for the aggregated is correct and the dimensions make sense
             to_updater = torch.stack([torch.cat([aggregated[nid], G.nodes_data[nid], G.global_data]) for nid in range(G.num_nodes)])
 
         if self._updater is None:
@@ -66,13 +65,13 @@ class NodeBlock(Block):
             return self._updater(to_updater)
 
 class EdgeBlock(Block):
-    def __init__(self, updater=None, independent=False):
-        super().__init__(independent)
+    def __init__(self, updater=None, independence_mode=IndependenceMode.DEPENDENT):
+        super().__init__(independence_mode)
         self._updater = updater
 
     def forward(self, G):
 
-        if self._independent:
+        if self._independence_mode == IndependenceMode.INDEPENDENT:
             updater_input = G.edges_data
         else:
             # TODO torch concat along axis 0? or 1?
@@ -88,10 +87,10 @@ class EdgeBlock(Block):
 
 
 class GlobalBlock(Block):
-    def __init__(self, updater=None, node_aggregator=None, edge_aggregator=None, independent=False):
-        super().__init__(independent)
+    def __init__(self, updater=None, node_aggregator=None, edge_aggregator=None, independence_mode=IndependenceMode.DEPENDENT):
+        super().__init__(independence_mode)
 
-        if independent:
+        if self._independence_mode == IndependenceMode.INDEPENDENT:
             if node_aggregator is not None or edge_aggregator is not None:
                 raise ValueError(
                     "`independent` is set to True, but you're passing an aggregator. Is something wrong?")
@@ -106,7 +105,7 @@ class GlobalBlock(Block):
             return G.global_data
 
         upd_input = [G.global_data]
-        if not self._independent:
+        if self._independence_mode == IndependenceMode.DEPENDENT:
             # Aggregate edge attributes globally
             upd_input.append(self._edge_aggregator([G.edges_data]).squeeze())
 
