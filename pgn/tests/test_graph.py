@@ -9,7 +9,7 @@ class TestGraph(unittest.TestCase):
         node_data = torch.Tensor([[0], [1]])
         edges_data = torch.Tensor([[0], [1], [2]])
         connectivity = [(0, 1), (0, 1), (1, 0)]
-        self.g = graph.Graph(node_data, edges_data, connectivity)
+        self.g = graph.Graph(node_data, edges_data, connectivity=connectivity)
 
     def test_graph_build(self):
 
@@ -29,11 +29,12 @@ class TestGraph(unittest.TestCase):
         self.assertEqual(self.g.senders[0], 0)
         self.assertEqual(self.g.receivers[0], 1)
         self.assertEqual(self.g.senders[1], 0)
-        self.assertEqual(self.g.receivers[2], 1)
+        self.assertEqual(self.g.receivers[1], 1)
         self.assertEqual(self.g.senders[2], 1)
         self.assertEqual(self.g.receivers[2], 0)
 
-        g._graph_summary()
+    def test_graph_summary(self):
+        self.g._graph_summary()
 
 
 if __name__ == '__main__':
