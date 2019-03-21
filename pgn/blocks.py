@@ -5,30 +5,59 @@ import torch.nn as nn
 
 from pgn.graph import copy_graph
 
+from enum import IntEnum, unique
+@unique
+class IndependenceMode(IntEnum):
+    # 0 do not aggregate
+    # 1 aggregate incoming only
+    # 2 aggregate outgoing only
+    # 3 aggregate incoming and outgoing
+
+    INDEPENDENT = 0
+    AGGREGATE_INCOMING = 1
+    AGGREGATE_OUTGOING = 2
+
+
 class Block(nn.Module):
-    def __init__(self, independent):
+    def __init__(self, independence_mode):
         super().__init__()
-        self._independent = independent
+        self._independence_mode = independence_mode
 
 
 class NodeBlock(Block):
-    def __init__(self, updater=None, node_aggregator=None, independent=False):
-        super().__init__(independent)
+    def __init__(self, updater=None, in_e2n_aggregator=None, out_e2n_aggregator=None, independence_mode=1):
+        super().__init__(independence_mode)
         self._updater = updater
 
-        if independent:
-            if node_aggregator is not None:
-                raise ValueError("`independent` is set to False, but you're passing an aggregator. Is something wrong?")
+        if independence_mode == IndependenceMode.INDEPENDENT:
+            if in_e2n_aggregator is not None or out_e2n_aggregator is not None:
+                raise ValueError("`Independence mode` is set to INDEPENDENT, but you're passing an aggregator. Is something wrong?")
         else:
-            self._node_aggregator = MeanAggregator() if node_aggregator is None else node_aggregator
-
+            if IndependenceMode.AGGREGATE_INCOMING & independence_mode:
+                self._in_e2n_aggregator = MeanAggregator() if in_e2n_aggregator is None else in_e2n_aggregator
+            elif in_e2n_aggregator is not None:
+                raise ValueError("`Independence mode` is set to not aggregate incoming, but you're passing an aggregator. Is something wrong?")
+            if IndependenceMode.AGGREGATE_OUTGOING & independence_mode:
+                self._out_e2n_aggregator = MeanAggregator() if out_e2n_aggregator is None else out_e2n_aggregator
+            elif in_e2n_aggregator is not None:
+                raise ValueError(
+                    "`Independence mode` is set to not aggregate outgoing, but you're passing an aggregator. Is something wrong?")
 
     def forward(self, G):
-        if self._independent:
+        if self._independence_mode == IndependenceMode.INDEPENDENT:
             to_updater = G.nodes_data
         else:
-            agg_input = [G.edges_data[G.incoming[nid]] for nid in range(G.num_nodes)]
-            aggregated = self._node_aggregator(agg_input)
+            aggregated = []
+            if IndependenceMode.AGGREGATE_INCOMING & self._independence_mode:
+                agg_input = [G.edges_data[G.incoming[nid]] for nid in range(G.num_nodes)]
+                aggregated.append(self._in_e2n_aggregator(agg_input))
+
+            if IndependenceMode.AGGREGATE_OUTGOING & self._independence_mode:
+                agg_input = [G.edges_data[G.outgoing[nid]] for nid in range(G.num_nodes)]
+                aggregated.append(self._out_e2n_aggregator(agg_input))
+            aggregated = torch.stack(aggregated)
+
+            # TODO write a unit test to check if the concatenation for the aggregated is correct and the dimensions make sense
             to_updater = torch.stack([torch.cat([aggregated[nid], G.nodes_data[nid], G.global_data]) for nid in range(G.num_nodes)])
 
         if self._updater is None:
