@@ -139,12 +139,12 @@ class Graph(object):
 
     def _graph_summary(self):
         for nid, ninfo in enumerate(self._nodes_info):
-            print("Node with id: %d, data: %s, incoming edges: %s, outcoming edges: %s" %
-                  (nid, str(self._nodes_data[nid]), ninfo['incoming'], ninfo['outgoing']))
+            print("Node with id: %d, data: %s, incoming edges: %s, outcoming edges: %s, type: %s." %
+                  (nid, str(self._nodes_data[nid]), ninfo['incoming'], ninfo['outgoing'], ninfo['type']))
 
         for eid, einfo in enumerate(self._edges_info):
-            print("Edge with id: %d, data: %s, sender id: %d, receiver id: %d." %
-                  (eid, self._edges_data[eid], einfo['connectivity'][0], einfo['connectivity'][1]))
+            print("Edge with id: %d, data: %s, sender id: %d, receiver id: %d, type: %s." %
+                  (eid, self._edges_data[eid], einfo['connectivity'][0], einfo['connectivity'][1], einfo['type']))
 
 def copy_graph_topology(G):
     nodes_data = torch.zeros_like(G.nodes_data)
