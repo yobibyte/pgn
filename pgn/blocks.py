@@ -3,7 +3,6 @@ from pgn.aggregators import MeanAggregator
 import torch
 import torch.nn as nn
 
-from pgn.graph import copy_graph
 
 from enum import IntEnum, unique
 @unique
@@ -124,7 +123,7 @@ class GraphNetwork(nn.Module):
 
     def forward(self, G, modify_input=False):
         if not modify_input:
-            G = copy_graph(G)
+            G = G.get_copy()
 
         # make one pass as in the original paper
 
