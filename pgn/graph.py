@@ -1,4 +1,7 @@
+from copy import deepcopy
+
 import torch
+
 
 class Entity(object):
     def __init__(self, id, type):
@@ -231,6 +234,64 @@ class DirectedGraph(object):
                        einfo.type)
                       )
 
+    def get_graph_with_same_topology(self):
+        entities = []
+        for vtype, vdata in self._vertices:
+            entities.append({
+                'data': torch.zeros_like(vdata['data']),
+                'info': deepcopy(vdata['info'])
+            })
+        for etype, edata in self._edges:
+            entities.append({
+                'data': torch.zeros_like(edata['data']),
+                'info': deepcopy(edata['info'])
+            })
+        return DirectedGraph(entities)
+
+    def get_copy(self):
+        entities = []
+        for vtype, vdata in self._vertices:
+            entities.append({
+                'data': vdata['data'].clone(),
+                'info': deepcopy(vdata['info'])
+            })
+        for etype, edata in self._edges:
+            entities.append({
+                'data': edata['data'].clone(),
+                'info': deepcopy(edata['info'])
+            })
+        return DirectedGraph(entities)
+
+    def concat(graph_list):
+        """
+        Concatenate features of the directed graphs with the same topology
+        Parameters
+        ----------
+        graph_list: list with pgn.graph.Graph entries
+
+        Returns
+        -------
+        A concatenated graph
+        """
+
+        if len(graph_list) == 0:
+            raise ValueError("Nothing to concatenate. Give me some graphs, man!")
+
+        if len(graph_list) == 1:
+            return graph_list[0]
+
+        # TODO check that topology is the same for everyone
+        # TODO it's wasteful to copy zeros every type, just get the stub for the data with Nones
+        res = graph_list[0].get_graph_with_same_topology()
+
+        for t in res.vertex_types:
+            res._vertices[t]['data'] = torch.cat([g._vertices[t]['data'] for g in graph_list], dim=1)
+
+        for t in res.edge_types:
+            res._edges[t]['data'] = torch.cat([g._edges[t]['data'] for g in graph_list], dim=1)
+
+        return res
+
 
 class DirectedGraphWithContext(DirectedGraph):
     def __init__(self, entities):
@@ -238,43 +299,4 @@ class DirectedGraphWithContext(DirectedGraph):
         self._context = [el for el in entities if isinstance(el, Context)][0]
 
 
-# def copy_graph_topology(G):
-#     nodes_data = torch.zeros_like(G.nodes_data)
-#     edges_data = torch.zeros_like(G.edges_data)
-#     global_data = torch.zeros_like(G.global_data)
-#     return Graph(nodes_data, edges_data, global_data, G.connectivity, G.nodes_types, G.edges_types)
-#
-# def concat_graphs(graph_list):
-#     """
-#     Concatenate features of the graphs with the same topology
-#
-#     Parameters
-#     ----------
-#     graph_list: list with pgn.graph.Graph entries
-#
-#     Returns
-#     -------
-#     A concatenated graph
-#     """
-#
-#     if len(graph_list) == 0:
-#         raise ValueError("Nothing to concatenate. Give me some graphs, man!")
-#
-#     if len(graph_list) == 1:
-#         return graph_list[0]
-#
-#     # TODO check that topology is the same for everyone
-#     res = copy_graph_topology(graph_list[0])
-#     res._nodes_data = torch.cat([g._nodes_data for g in graph_list], dim=1)
-#     res._edges_data = torch.cat([g._edges_data for g in graph_list], dim=1)
-#     res._global_data = torch.cat([g._global_data for g in graph_list])
-#     return res
-#
-#
-# def copy_graph(G):
-#     return Graph(G._nodes_data.clone(),
-#                  G._edges_data.clone(),
-#                  G._global_data.clone(),
-#                  G.connectivity,
-#                  G.nodes_types,
-#                  G.edges_types)
+
