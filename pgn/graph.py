@@ -15,11 +15,12 @@ class Entity(object):
 
 
 class DirectedEdge(Entity):
-    def __init__(self, id, sender_id, receiver_id, connectees_type='vertex', type='edge'):
+    def __init__(self, id, sender_id, receiver_id, sender_type='vertex', receiver_type='vertex', type='edge'):
         super().__init__(id, type)
         self._sender_id = sender_id
         self._receiver_id = receiver_id
-        self._connectees_type = connectees_type
+        self._sender_type = sender_type
+        self._receiver_type = receiver_type
 
     @property
     def sender_id(self):
@@ -30,8 +31,12 @@ class DirectedEdge(Entity):
         return self._receiver_id
     
     @property
-    def connectees_type(self):
-        return self._connectees_type
+    def sender_type(self):
+        return self._sender_type
+
+    @property
+    def receiver_type(self):
+        return self._receiver_type
 
 
 class Vertex(Entity):
@@ -64,13 +69,13 @@ class DirectedGraph(object):
                                  "from the number of edges in the 'info' list" % t)
 
             # get corresponding vertex type
-            valid_vcs = range(self.num_vertices(v['info'][0].connectees_type))
+            valid_receivers = range(self.num_vertices(v['info'][0].sender_type))
             for e in v['info']:
-                if e.sender_id not in valid_vcs:
+                if e.sender_id not in range(self.num_vertices(v['info'][0].sender_type)):
                     raise ValueError(
                         "Sender %d for edge %d of type %s is invalid. It's either its id is negative or bigger "
                         "then number of your nodes. " % (e.sender_id, e.id, e.type))
-                if e.receiver_id not in valid_vcs:
+                if e.receiver_id not in range(self.num_vertices(v['info'][0].receiver_type)):
                     raise ValueError(
                         "Receiver %d for edge %d of type %s is invalid. It's either its id is negative or bigger "
                         "then number of your nodes. " % (e.receiver_id, e.id, e.type))
@@ -129,7 +134,7 @@ class DirectedGraph(object):
 
     @property
     def vertex_types(self):
-        return list(self._edges.keys())
+        return list(self._vertices.keys())
 
     def senders(self, id=None, edge_type=None):
         edge_type = self.default_edge_type if edge_type is None else edge_type
@@ -155,13 +160,13 @@ class DirectedGraph(object):
             for v_id in range(self.num_vertices(vertex_type)):
                 curr_v = []
                 for k, v in self._edges.items():
-                    curr_v.append({k: [el.id for el in v['info'] if el.receiver_id == v_id and el.connectees_type == vertex_type]})
+                    curr_v.append({k: [el.id for el in v['info'] if el.receiver_id == v_id and el.receiver_type == vertex_type]})
                 if self.num_edge_types == 1:
                     curr_v = curr_v[0][self.default_edge_type]
                 incoming.append(curr_v)
         else:
             for k, v in self._edges.items():
-                incoming.append({k: [el.id for el in v['info'] if el.receiver_id == id and el.connectees_type == vertex_type]})
+                incoming.append({k: [el.id for el in v['info'] if el.receiver_id == id and el.receiver_type == vertex_type]})
             if self.num_edge_types == 1:
                 return incoming[0][self.default_edge_type]
         return incoming
@@ -174,13 +179,13 @@ class DirectedGraph(object):
             for v_id in range(self.num_vertices(vertex_type)):
                 curr_v = []
                 for k, v in self._edges.items():
-                    curr_v.append({k: [el.id for el in v['info'] if el.sender_id == v_id and el.connectees_type == vertex_type]})
+                    curr_v.append({k: [el.id for el in v['info'] if el.sender_id == v_id and el.sender_type == vertex_type]})
                 if self.num_edge_types == 1:
                     curr_v = curr_v[0][self.default_edge_type]
                 outgoing.append(curr_v)
         else:
             for k, v in self._edges.items():
-                outgoing.append({k: [el.id for el in v['info'] if el.sender_id == id and el.connectees_type == vertex_type]})
+                outgoing.append({k: [el.id for el in v['info'] if el.sender_id == id and el.sender_type == vertex_type]})
             if self.num_edge_types == 1:
                 return outgoing[0][self.default_edge_type]
 
@@ -199,16 +204,32 @@ class DirectedGraph(object):
             raise ValueError("I have more than one edge type, you need to provide a type to get the data")
         return next(iter(self._edges.keys()))
 
-    # def _graph_summary(self):
-    #     for vt in self.vertex_types:
-    #         print('Vertices of type %s' %vt)
-    #         for vid, vinfo in enumerate(self._vertices[vt]):
-    #             print("Node with id: %d, data: %s, incoming edges: %s, outcoming edges: %s, type: %s." %
-    #                   (vid, str(self._vertices[vt]['data'][vid]), vinfo['incoming'], vinfo['outgoing'], vinfo['type']))
+    def _graph_summary(self):
+        print('Graph summary')
+        print('-------------')
 
-        # for eid, einfo in enumerate(self._edges_info):
-        #     print("Edge with id: %d, data: %s, sender id: %d, receiver id: %d, type: %s." %
-        #           (eid, self._edges_data[eid], einfo['connectivity'][0], einfo['connectivity'][1], einfo['type']))
+        for vt in self.vertex_types:
+            print("Vertices of type '%s'" % vt)
+
+            for vid, vinfo in enumerate(self._vertices[vt]['info']):
+                print("Vertex with id: %d, data: %s, incoming edges: %s, outcoming edges: %s, type: %s." %
+                      (vid,
+                       str(self._vertices[vt]['data'][vid]),
+                       self.incoming_edges(id=vid, vertex_type=vinfo.type),
+                       self.outgoing_edges(id=vid, vertex_type=vinfo.type),
+                       vinfo.type)
+                      )
+
+        for et in self.edge_types:
+            print("Edges of type '%s'" % et)
+            for eid, einfo in enumerate(self._edges[et]['info']):
+                print("Edge with id: %d, data: %s, sender id: %d, receiver id: %d, type: %s." %
+                      (eid,
+                       str(self._edges[et]['data'][eid]),
+                       einfo.sender_id,
+                       einfo.receiver_id,
+                       einfo.type)
+                      )
 
 
 class DirectedGraphWithContext(DirectedGraph):

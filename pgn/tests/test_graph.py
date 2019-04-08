@@ -45,8 +45,8 @@ class TestGraph(unittest.TestCase):
         self.assertEqual(self.g.senders()[0], 0)
         self.assertEqual(self.g.receivers()[0], 1)
 
-    # def test_graph_summary(self):
-    #     self.g._graph_summary()
+    def test_graph_summary(self):
+        self.g._graph_summary()
 
 
 if __name__ == '__main__':
