@@ -11,10 +11,18 @@ class Aggregator(nn.Module):
         i.e. be input permutation and # of inputs invariant.
     """
 
+    def __init__(self, type=None):
+        super().__init__()
+        self._type = type
+
     def forward(self, X):
         if type(X) == list:
             return torch.stack(X)
         return X
+
+    @property
+    def type(self):
+        return self._type
 
 class MeanAggregator(Aggregator):
     def forward(self, X):
