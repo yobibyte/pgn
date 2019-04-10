@@ -13,6 +13,12 @@ class Block(nn.Module):
     def independent(self):
         return self._independent
 
+    def parameters(self, recurse=True):
+        params = []
+        for el in self._updaters.values():
+            params.append(el.parameters())
+        return params
+
 
 class NodeBlock(Block):
     def __init__(self, updaters=None, e2n_aggregators=None):
@@ -36,7 +42,7 @@ class NodeBlock(Block):
                     aggregated[at] = self._e2n_aggregators[at](agg_input)
 
                     # TODO the dims should be [node, aggregated features]
-                    aggregated = torch.cat([el for el in aggregated.values()], dim=1)
+                aggregated = torch.cat([el for el in aggregated.values()], dim=1)
                 if isinstance(G, pg.DirectedGraphWithContext):
                     to_updater = torch.stack([torch.cat([aggregated[nid], vdata[t][nid], G.context_data(concat=True)]) for nid in range(G.num_vertices(t))])
                 else:
@@ -75,14 +81,13 @@ class EdgeBlock(Block):
                     inpt = [torch.cat([edata[e],
                                        vertex_data[einfo[e].receiver.type][einfo[e].receiver.id],
                                        vertex_data[einfo[e].sender.type][einfo[e].sender.id],
-                                       ]) for e
-                            in range(G.num_edges(et))]
+                                       ]) for e in range(G.num_edges(et))]
                 updater_input = torch.stack(inpt)
 
             if et not in self._updaters:
                 out[et] = updater_input
             else:
-                out[et] = self._updater(updater_input)
+                out[et] = self._updaters[et](updater_input)
         return out
 
 class GlobalBlock(Block):
@@ -108,14 +113,12 @@ class GlobalBlock(Block):
 
                 for etype, edata in G.edge_data().items():
                     # Aggregate edge attributes globally
-                    import pdb; pdb.set_trace();
                     upd_input.append(self._edge_aggregators[etype]([edata]).squeeze())
-
+            upd_input = torch.cat(upd_input)
             if t not in self._updaters:
                 out[t] = upd_input
             else:
-                out[t] = self._updater(upd_input)
-
+                out[t] = self._updaters[t](upd_input)
         return out
 
 class GraphNetwork(nn.Module):
@@ -128,7 +131,6 @@ class GraphNetwork(nn.Module):
     def forward(self, G, modify_input=False):
         if not modify_input:
             G = G.get_copy()
-
         # make one pass as in the original paper
 
         # 1. Compute updated edge attributes
@@ -145,6 +147,8 @@ class GraphNetwork(nn.Module):
         # 5. Aggregate node attributes globally
         # 6. Compute updated global attribute
         if self._global_block is not None:
-            G.global_data = self._global_block(G)
-
+            G.set_context_data(self._global_block(G))
         return G
+
+    def parameters(self, recurse=True):
+        return self._node_block.parameters() + self._edge_block.parameters() + self._global_block.parameters()

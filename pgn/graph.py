@@ -334,6 +334,9 @@ class DirectedGraphWithContext(DirectedGraph):
         for t in res.edge_types:
             res._edges[t]['data'] = torch.cat([g._edges[t]['data'] for g in graph_list], dim=1)
 
+        for t in res._context:
+            res._context[t]['data'] = torch.cat([g._context[t]['data'] for g in graph_list])
+
         return res
 
     def context_data(self, type=None, concat=False):
@@ -349,10 +352,10 @@ class DirectedGraphWithContext(DirectedGraph):
         if not isinstance(data, dict):
             if type is None:
                 type = self.default_context_type
-            self._context[type] = data
+            self._context[type]['data'] = data
         else:
             for type, d in data.items():
-                self._context[type] = d
+                self._context[type]['data'] = d
 
     def get_entities(self, zero_data=False):
         entities = super().get_entities(zero_data)

@@ -52,7 +52,7 @@ def create_target_graph(input_graph):
     min_value = min([v[1] for v in values])
 
     # [prob_true, prob_false]
-    target_graph.nodes_data = torch.Tensor([[1.0, 0.0] if v == min_value else [0.0, 1.0] for v in vertex_data])
+    target_graph.set_vertex_data(torch.Tensor([[1.0, 0.0] if v == min_value else [0.0, 1.0] for v in vertex_data]))
 
     sorted_values = sorted(values, key=lambda x: x[1])
     sorted_ids = [v[0] for v in sorted_values]
@@ -105,13 +105,11 @@ def forward(input_g, encoder, core, decoder, core_steps):
     input_copy = input_g.get_copy()
     latent = encoder(input_copy)
     latent0 = latent.get_copy()
-
     output = []
     for s in range(core_steps):
         concatenated = DirectedGraphWithContext.concat([latent0, latent])
         latent = core(concatenated)
         output.append(decoder(latent))
-
     return output
 
 def generate_graph_batch(n_examples, sample_length, target=True):
@@ -132,8 +130,8 @@ def process_batch(encoder, core, decoder, core_steps, input_graphs, target_graph
     edge_loss = 0
     for input_g, target_g in zip(input_graphs, target_graphs):
         g_out = forward(input_g, encoder, core, decoder, core_steps)
-        node_loss += sum([criterion(g.nodes_data, target_g.nodes_data) for g in g_out])
-        edge_loss += sum([criterion(g.edges_data, target_g.edges_data) for g in g_out])
+        node_loss += sum([criterion(g.vertex_data('vertex'), target_g.vertex_data('vertex')) for g in g_out])
+        edge_loss += sum([criterion(g.edge_data('edge'), target_g.edge_data('edge')) for g in g_out])
     loss = node_loss + edge_loss
 
     if not compute_grad:
@@ -147,7 +145,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Sorting with graph networks')
     parser.add_argument('--num-train', type=int, default=10, help='number of training examples')
     parser.add_argument('--num-eval', type=int, default=10, help='number of evaluation examples')
-    parser.add_argument('--epochs', type=int, default=1000, help='number of training epochs')
+    parser.add_argument('--epochs', type=int, default=100, help='number of training epochs')
     parser.add_argument('--core-steps', type=int, default=10, help='number of core processing steps')
     parser.add_argument('--sample-length', type=int, default=10, help='number of elements in the list to sort')
     parser.add_argument('--eval-freq', type=int, default=100, help='Evaluation/logging frequency')
@@ -159,23 +157,27 @@ if __name__ == '__main__':
 
     enc_node_updater, enc_edge_updater, enc_global_updater = get_mlp_updaters(1, 1, 1, 16, 16, 16, independent=True)
     encoder = GraphNetwork(NodeBlock({'vertex': enc_node_updater}),
-                           EdgeBlock(enc_edge_updater),
-                           GlobalBlock(enc_global_updater))
+                           EdgeBlock({'edge': enc_edge_updater}, independent=True),
+                           GlobalBlock({'context': enc_global_updater}))
 
     core_node_updater, core_edge_updater, core_global_updater = get_mlp_updaters(32, 32, 32, 16, 16, 16, independent=False)
-    core = GraphNetwork(NodeBlock(core_node_updater, {'edge': MeanAggregator()}),
-                        EdgeBlock(core_edge_updater, independent=False),
-                        GlobalBlock(core_global_updater, {'vertex': MeanAggregator(), 'edge': MeanAggregator()}))
+    core = GraphNetwork(NodeBlock({'vertex':core_node_updater}, {'edge': MeanAggregator()}),
+                        EdgeBlock({'edge':core_edge_updater}),
+                        GlobalBlock({'context':core_global_updater}, {'vertex': MeanAggregator()}, {'edge': MeanAggregator()}))
 
     dec_node_updater, dec_edge_updater, dec_global_updater = get_mlp_updaters(16, 16, 16, 16, 16, 16, independent=True)
-    decoder = GraphNetwork(NodeBlock(nn.Sequential(dec_node_updater, nn.Linear(16, 2))),
-                           EdgeBlock(nn.Sequential(dec_edge_updater, nn.Linear(16, 2))),
-                           GlobalBlock(nn.Sequential(dec_global_updater, nn.Linear(16, 2))),
+    decoder = GraphNetwork(NodeBlock({'vertex':nn.Sequential(dec_node_updater, nn.Linear(16, 2))}),
+                           EdgeBlock({'edge':nn.Sequential(dec_edge_updater, nn.Linear(16, 2))}, independent=True),
+                           GlobalBlock({'context':nn.Sequential(dec_global_updater, nn.Linear(16, 2))}),
                            )
     models = [encoder] + [core] * args.core_steps + [decoder]
 
     criterion = nn.BCEWithLogitsLoss()
-    parameters = list(encoder.parameters())+list(core.parameters())+list(decoder.parameters())
+
+    parameters = []
+    for el in [encoder, core, decoder]:
+        for plist in el.parameters():
+            parameters.extend(list(plist))
     optimiser = torch.optim.Adam(lr=0.001, params=parameters)
 
     # train
@@ -192,7 +194,7 @@ if __name__ == '__main__':
 
     unsorted = np.random.uniform(size=args.sample_length)
     test_g = graph_from_list(unsorted)
-    test_g.global_data = torch.Tensor([0])
+    test_g.set_context_data(torch.Tensor([0]))
     g = forward(test_g, encoder, core, decoder, args.core_steps)[-1]
 
     # evaluate and plot
