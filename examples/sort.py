@@ -145,7 +145,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Sorting with graph networks')
     parser.add_argument('--num-train', type=int, default=10, help='number of training examples')
     parser.add_argument('--num-eval', type=int, default=10, help='number of evaluation examples')
-    parser.add_argument('--epochs', type=int, default=100, help='number of training epochs')
+    parser.add_argument('--epochs', type=int, default=1000, help='number of training epochs')
     parser.add_argument('--core-steps', type=int, default=10, help='number of core processing steps')
     parser.add_argument('--sample-length', type=int, default=10, help='number of elements in the list to sort')
     parser.add_argument('--eval-freq', type=int, default=100, help='Evaluation/logging frequency')
@@ -199,8 +199,8 @@ if __name__ == '__main__':
 
     # evaluate and plot
     mx = np.zeros((len(unsorted), len(unsorted)))
-    for eid in range(g.num_edges):
-        mx[g.senders[eid]][g.receivers[eid]] = g.edges_data[eid, 0]
+    for eid in range(g.num_edges('edge')):
+        mx[g.senders(eid, 'edge').id][g.receivers(eid, 'edge').id] = g.edge_data('edge')[eid, 0]
     sort_indices = np.argsort(unsorted)
     plt.matshow(mx[sort_indices][:, sort_indices], cmap="viridis")
     plt.grid(False)

@@ -349,6 +349,7 @@ class DirectedGraphWithContext(DirectedGraph):
             return self._context[type]['data']
 
     def set_context_data(self, data, type=None):
+
         if not isinstance(data, dict):
             if type is None:
                 type = self.default_context_type
@@ -368,6 +369,6 @@ class DirectedGraphWithContext(DirectedGraph):
 
     @property
     def default_context_type(self):
-        if len(self._contex.keys()) > 1:
+        if len(self._context.keys()) > 1:
             raise ValueError("I have more than one vertex type, you need to provide a type to get the data")
         return next(iter(self._context.keys()))
