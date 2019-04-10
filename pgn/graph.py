@@ -96,31 +96,14 @@ class DirectedGraph(object):
     def num_vertex_types(self):
         return len(self.vertex_types)
 
-    def identify_edge_by_sender_and_receiver(self, sender_id, receiver_id, vertex_type=None):
-        if vertex_type is None and len(self.vertex_types) > 1:
-            raise ValueError("I have more than one vertex type, you need to provide a type to identify an edge")
-
-        if vertex_type is None:
-            vertices = next(iter(self._vertices.values()))
-        else:
-            vertices = self._vertices[vertex_type]
-
-        if sender_id > self.num_edges - 1 or receiver_id > self.num_edges -1:
-            return -1
-
-        for eid in range(self.num_edges):
-            if vertices[eid].sender_id == sender_id and vertices[eid].receiver.id == receiver_id:
-                return eid
-
+    def identify_edge_by_sender_and_receiver(self, sender_id, receiver_id, edge_type=None):
+        for etype, einfo in self._edges.items():
+            if sender_id > self.num_edges(etype) - 1 or receiver_id > self.num_edges(etype) - 1:
+                continue
+            for e in einfo['info']:
+                if e.sender.id == sender_id and e.receiver.id == receiver_id:
+                    return e
         return -1
-
-    def edge_data(self, type=None):
-        if type is None and len(self.edge_types) > 1:
-            raise ValueError("I have more than one edge type, you need to provide a type to get the data")
-        if type is None:
-            return next(iter(self._edges.values()))['data']
-        else:
-            return self._edges[type]['data']
 
     def vertex_data(self, type=None):
         if type is None:
@@ -133,6 +116,36 @@ class DirectedGraph(object):
             return {k: v['data'] for k,v in self._edges.items()}
         else:
             return self._edges[type]['data']
+
+    def set_edge_data(self, data, type=None):
+        if not isinstance(data, dict):
+            if type is None:
+                type = self.default_edge_type
+            self._edges[type]['data'] = data
+        else:
+            for type, d in data.items():
+                self._edges[type]['data'] = d
+
+    def set_vertex_data(self, data, type=None):
+        if not isinstance(data, dict):
+            if type is None:
+                type = self.default_vertex_type
+            self._vertices[type]['data'] = data
+        else:
+            for type, d in data.items():
+                self._vertices[type]['data'] = d
+
+    def vertex_info(self, type=None):
+        if type is None:
+            return {k: v['info'] for k,v in self._vertices.items()}
+        else:
+            return self._vertices[type]['info']
+
+    def edge_info(self, type=None):
+        if type is None:
+            return {k: v['info'] for k,v in self._edges.items()}
+        else:
+            return self._edges[type]['info']
 
     @property
     def edge_types(self):
@@ -237,33 +250,29 @@ class DirectedGraph(object):
                        einfo.type)
                       )
 
-    def get_graph_with_same_topology(self):
+    def get_entities(self, zero_data=False):
         entities = []
-        for vtype, vdata in self._vertices:
-            entities.append({
-                'data': torch.zeros_like(vdata['data']),
-                'info': deepcopy(vdata['info'])
-            })
-        for etype, edata in self._edges:
-            entities.append({
-                'data': torch.zeros_like(edata['data']),
-                'info': deepcopy(edata['info'])
-            })
-        return DirectedGraph(entities)
+        for vtype, vdata in self._vertices.items():
+            vdict = {'info': deepcopy(vdata['info'])}
+            if zero_data:
+                vdict['data'] = torch.zeros_like(vdata['data'])
+            else:
+                vdict['data'] = vdata['data'].clone()
+            entities.append(vdict)
+        for etype, edata in self._edges.items():
+            edict = {'info': deepcopy(edata['info'])}
+            if zero_data:
+                edict['data'] = torch.zeros_like(edata['data'])
+            else:
+                edict['data'] = edata['data'].clone()
+            entities.append(edict)
+        return entities
 
     def get_copy(self):
-        entities = []
-        for vtype, vdata in self._vertices:
-            entities.append({
-                'data': vdata['data'].clone(),
-                'info': deepcopy(vdata['info'])
-            })
-        for etype, edata in self._edges:
-            entities.append({
-                'data': edata['data'].clone(),
-                'info': deepcopy(edata['info'])
-            })
-        return DirectedGraph(entities)
+        return self.__class__(self.get_entities(zero_data=False))
+
+    def get_graph_with_same_topology(self):
+        return self.__class__(self.get_entities(zero_data=True))
 
     def concat(graph_list):
         """
@@ -299,11 +308,63 @@ class DirectedGraph(object):
 class DirectedGraphWithContext(DirectedGraph):
     def __init__(self, entities):
         super().__init__(entities)
-        self._context = [el for el in entities if isinstance(el, Context)][0]
+        self._context = {el['info'][0].type: el for el in entities if isinstance(el['info'][0], Context)}
 
     @property
     def context(self):
         return self._context
 
+    def concat(graph_list):
+        # TODO reuse the code from the parent class as much as possible
+        # this is just a temporary (huh) copypaste from the parent class
 
+        if len(graph_list) == 0:
+            raise ValueError("Nothing to concatenate. Give me some graphs, man!")
 
+        if len(graph_list) == 1:
+            return graph_list[0]
+
+        # TODO check that topology is the same for everyone
+        # TODO it's wasteful to copy zeros every type, just get the stub for the data with Nones
+        res = graph_list[0].get_graph_with_same_topology()
+
+        for t in res.vertex_types:
+            res._vertices[t]['data'] = torch.cat([g._vertices[t]['data'] for g in graph_list], dim=1)
+
+        for t in res.edge_types:
+            res._edges[t]['data'] = torch.cat([g._edges[t]['data'] for g in graph_list], dim=1)
+
+        return res
+
+    def context_data(self, type=None, concat=False):
+        if type is None:
+            if concat:
+                return torch.cat([v['data'] for k, v in self._context.items()])
+            else:
+                return {k: v['data'] for k,v in self._context.items()}
+        else:
+            return self._context[type]['data']
+
+    def set_context_data(self, data, type=None):
+        if not isinstance(data, dict):
+            if type is None:
+                type = self.default_context_type
+            self._context[type] = data
+        else:
+            for type, d in data.items():
+                self._context[type] = d
+
+    def get_entities(self, zero_data=False):
+        entities = super().get_entities(zero_data)
+        for cdata in self._context.values():
+            entities.append({
+                'data': cdata['data'].clone(),
+                'info': deepcopy(cdata['info'])
+            })
+        return entities
+
+    @property
+    def default_context_type(self):
+        if len(self._contex.keys()) > 1:
+            raise ValueError("I have more than one vertex type, you need to provide a type to get the data")
+        return next(iter(self._context.keys()))

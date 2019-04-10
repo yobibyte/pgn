@@ -8,8 +8,9 @@ import itertools
 import torch
 import torch.nn as nn
 
-from pgn.graph import Graph, concat_graphs, copy_graph, copy_graph_topology
-from pgn.blocks import NodeBlock, EdgeBlock, GlobalBlock, GraphNetwork, IndependenceMode, NodeIndependenceMode
+from pgn.graph import DirectedGraphWithContext, Vertex, DirectedEdge, Context
+from pgn.blocks import NodeBlock, EdgeBlock, GlobalBlock, GraphNetwork
+from pgn.aggregators import MeanAggregator
 
 import argparse
 
@@ -29,40 +30,44 @@ def graph_from_list(input_list):
     pgn.Graph with the input_list values as nodes
     """
     connectivity = [el for el in itertools.product(range(len(input_list)), repeat=2)]
-    return Graph(nodes_data=torch.Tensor([[v] for v in input_list]),
-                 edges_data=torch.zeros(len(connectivity), 1),
-                 connectivity=connectivity,
-                 global_data=torch.Tensor([0])
-                 )
+    vertices = [Vertex(i) for i in range(len(input_list))]
+    entities = [
+        {'data': torch.Tensor([[v] for v in input_list]),
+         'info': vertices},
+        {'data': torch.zeros(len(connectivity), 1),
+         'info': [DirectedEdge(i, vertices[connectivity[i][0]], vertices[connectivity[i][1]]) for i in range(len(connectivity))]},
+        {'data': torch.Tensor([0]), 'info': [Context(0)]}
+    ]
+
+    return DirectedGraphWithContext(entities)
 
 
 def create_target_graph(input_graph):
     # two nodes might have true since they might have similar values
 
-    target_graph = copy_graph_topology(input_graph)
+    target_graph = input_graph.get_graph_with_same_topology()
 
-    nodes_data = [v.item() for v in input_graph.nodes_data]
-    values = [(nid, ndata) for nid, ndata in enumerate(nodes_data)]
+    vertex_data = [v.item() for v in input_graph.vertex_data('vertex')]
+    values = [(nid, ndata) for nid, ndata in enumerate(vertex_data)]
     min_value = min([v[1] for v in values])
-    target_graph.nodes_data = torch.Tensor(
-        # prob_true, prob_false
-        [[1.0, 0.0] if v == min_value else [0.0, 1.0] for v in nodes_data])
+
+    # [prob_true, prob_false]
+    target_graph.nodes_data = torch.Tensor([[1.0, 0.0] if v == min_value else [0.0, 1.0] for v in vertex_data])
 
     sorted_values = sorted(values, key=lambda x: x[1])
     sorted_ids = [v[0] for v in sorted_values]
 
-    data = torch.zeros(input_graph.num_edges, 2)
-
+    data = torch.zeros(input_graph.num_edges('edge'), 2)
     for sidx, sid in enumerate(sorted_ids):
         for ridx, rid in enumerate(sorted_ids):
-            # get edge id by sid and rid
-            eid = input_graph.identify_edge_by_sender_and_receiver(sid, rid)
+            eid = input_graph.identify_edge_by_sender_and_receiver(sid, rid).id
             # we look for exact comparison here since we sort
             if (sidx < len(sorted_ids) - 1 and ridx == sidx + 1):
                 data[eid][0] = 1.0
             else:
                 data[eid][1] = 1.0
-    target_graph.edges_data = data
+
+    target_graph.set_edge_data(data)
 
     return target_graph
 
@@ -84,8 +89,8 @@ def get_mlp_updaters(input_node_size,
              output_node_size,
              output_edge_size,
              output_global_size,
-             independence_mode):
-    if independence_mode==IndependenceMode.INDEPENDENT:
+             independent):
+    if independent:
         edge_updater = get_mlp(input_edge_size, [16, output_edge_size])
         node_updater = get_mlp(input_node_size, [16, output_node_size])
         global_updater = get_mlp(input_global_size, [16, output_global_size])
@@ -97,13 +102,13 @@ def get_mlp_updaters(input_node_size,
     return node_updater, edge_updater, global_updater
 
 def forward(input_g, encoder, core, decoder, core_steps):
-    input_copy = copy_graph(input_g)
+    input_copy = input_g.get_copy()
     latent = encoder(input_copy)
-    latent0 = copy_graph(latent)
+    latent0 = latent.get_copy()
 
     output = []
     for s in range(core_steps):
-        concatenated = concat_graphs([latent0, latent])
+        concatenated = DirectedGraphWithContext.concat([latent0, latent])
         latent = core(concatenated)
         output.append(decoder(latent))
 
@@ -152,20 +157,20 @@ if __name__ == '__main__':
     eval_input_graphs, eval_target_graphs = generate_graph_batch(args.num_train, sample_length=args.sample_length)
 
 
-    enc_node_updater, enc_edge_updater, enc_global_updater = get_mlp_updaters(1, 1, 1, 16, 16, 16, independence_mode=IndependenceMode.INDEPENDENT)
-    encoder = GraphNetwork(NodeBlock(enc_node_updater, independence_mode=NodeIndependenceMode.INDEPENDENT),
-                           EdgeBlock(enc_edge_updater, independence_mode=IndependenceMode.INDEPENDENT),
-                           GlobalBlock(enc_global_updater, independence_mode=IndependenceMode.INDEPENDENT))
+    enc_node_updater, enc_edge_updater, enc_global_updater = get_mlp_updaters(1, 1, 1, 16, 16, 16, independent=True)
+    encoder = GraphNetwork(NodeBlock({'vertex': enc_node_updater}),
+                           EdgeBlock(enc_edge_updater),
+                           GlobalBlock(enc_global_updater))
 
-    core_node_updater, core_edge_updater, core_global_updater = get_mlp_updaters(32, 32, 32, 16, 16, 16, independence_mode=IndependenceMode.DEPENDENT)
-    core = GraphNetwork(NodeBlock(core_node_updater),
-                        EdgeBlock(core_edge_updater),
-                        GlobalBlock(core_global_updater))
+    core_node_updater, core_edge_updater, core_global_updater = get_mlp_updaters(32, 32, 32, 16, 16, 16, independent=False)
+    core = GraphNetwork(NodeBlock(core_node_updater, {'edge': MeanAggregator()}),
+                        EdgeBlock(core_edge_updater, independent=False),
+                        GlobalBlock(core_global_updater, {'vertex': MeanAggregator(), 'edge': MeanAggregator()}))
 
-    dec_node_updater, dec_edge_updater, dec_global_updater = get_mlp_updaters(16, 16, 16, 16, 16, 16, independence_mode=IndependenceMode.INDEPENDENT)
-    decoder = GraphNetwork(NodeBlock(nn.Sequential(dec_node_updater, nn.Linear(16, 2)), independence_mode=NodeIndependenceMode.INDEPENDENT),
-                           EdgeBlock(nn.Sequential(dec_edge_updater, nn.Linear(16, 2)), independence_mode=IndependenceMode.INDEPENDENT),
-                           GlobalBlock(nn.Sequential(dec_global_updater, nn.Linear(16, 2)), independence_mode=IndependenceMode.INDEPENDENT),
+    dec_node_updater, dec_edge_updater, dec_global_updater = get_mlp_updaters(16, 16, 16, 16, 16, 16, independent=True)
+    decoder = GraphNetwork(NodeBlock(nn.Sequential(dec_node_updater, nn.Linear(16, 2))),
+                           EdgeBlock(nn.Sequential(dec_edge_updater, nn.Linear(16, 2))),
+                           GlobalBlock(nn.Sequential(dec_global_updater, nn.Linear(16, 2))),
                            )
     models = [encoder] + [core] * args.core_steps + [decoder]
 
