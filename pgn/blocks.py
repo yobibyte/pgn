@@ -36,20 +36,19 @@ class NodeBlock(Block):
             if self.independent:
                 to_updater = vdata[t]
             else:
-                in_aggregated = {}
+                in_aggregated = []
                 if self._in_e2n_aggregators is not None:
                     # TODO rewrite if the order of concat matters
                     for at in self._in_e2n_aggregators:
                         agg_input = [edata[at][G.incoming_edges(nid, t)] for nid in range(G.num_vertices(t))]
-                        in_aggregated[at] = self._in_e2n_aggregators[at](agg_input)
+                        in_aggregated.append(self._in_e2n_aggregators[at](agg_input))
 
-                out_aggregated = {}
+                out_aggregated = []
                 if self._out_e2n_aggregators is not None:
                     for at in self._out_e2n_aggregators:
                         agg_input = [edata[at][G.outgoing_edges(nid, t)] for nid in range(G.num_vertices(t))]
-                        out_aggregated[at] = self._out_e2n_aggregators[at](agg_input)
+                        out_aggregated.append(self._out_e2n_aggregators[at](agg_input))
 
-                aggregated = list(in_aggregated.values()) + list(out_aggregated.values())
                 # TODO the dims should be [node, aggregated features], check this thoroughly
                 aggregated = torch.cat(aggregated, dim=1)
                 if isinstance(G, pg.DirectedGraphWithContext):
@@ -64,7 +63,6 @@ class NodeBlock(Block):
 
         return out
 
-# TODO do refactoring with the below code
 
 class EdgeBlock(Block):
     def __init__(self, updaters=None, independent=False):
@@ -98,6 +96,7 @@ class EdgeBlock(Block):
             else:
                 out[et] = self._updaters[et](updater_input)
         return out
+
 
 class GlobalBlock(Block):
     def __init__(self, updaters=None, vertex_aggregators=None, edge_aggregators=None):
