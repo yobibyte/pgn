@@ -42,12 +42,13 @@ def plot_graph(g, fname='graph.pdf'):
 
     # adding attributes to edges in multigraphs is more complicated but see
     # https://stackoverflow.com/a/26694158
-    g[1][0][2].update({'color': 'red'})
+    #g[1][0][2].update({'color': 'red'})
 
     a = to_agraph(g)
     a.layout('dot')
     a.draw(fname)
 
-g = generate_graph()
-ng = pgn2nx(g)
-plot_graph(ng)
+if __name__ == '__main__':
+    g = generate_graph()
+    ng = pgn2nx(g)
+    plot_graph(ng)
