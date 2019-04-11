@@ -145,7 +145,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Sorting with graph networks')
     parser.add_argument('--num-train', type=int, default=10, help='number of training examples')
     parser.add_argument('--num-eval', type=int, default=10, help='number of evaluation examples')
-    parser.add_argument('--epochs', type=int, default=1000, help='number of training epochs')
+    parser.add_argument('--epochs', type=int, default=5000, help='number of training epochs')
     parser.add_argument('--core-steps', type=int, default=10, help='number of core processing steps')
     parser.add_argument('--sample-length', type=int, default=10, help='number of elements in the list to sort')
     parser.add_argument('--eval-freq', type=int, default=100, help='Evaluation/logging frequency')
@@ -204,4 +204,8 @@ if __name__ == '__main__':
     sort_indices = np.argsort(unsorted)
     plt.matshow(mx[sort_indices][:, sort_indices], cmap="viridis")
     plt.grid(False)
-    plt.show()
+    try:
+        plt.show()
+    except:
+        print("Wasn't able to show the plot. But I'll save it.")
+    plt.savefig('pgn_sorting_output.png')
