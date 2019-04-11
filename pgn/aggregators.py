@@ -16,6 +16,16 @@ class Aggregator(nn.Module):
         self._type = type
 
     def forward(self, X):
+        """
+
+        Parameters
+        ----------
+        X should be of shape [# vertex, # elements, # element features]
+
+        Returns
+        -------
+
+        """
         if type(X) == list:
             return torch.Tensor(X)
         return X
@@ -29,4 +39,4 @@ class MeanAggregator(Aggregator):
         # We can't simply batch this since the sublists can be of unequal length.
         # We either need to do this in a for loop or pad in a smart way
         # (simple padding will affect the average results, for instance).
-        return torch.Tensor([(super(MeanAggregator, self).forward(el)).mean() for el in X])
+        return torch.stack([(super(MeanAggregator, self).forward(el)).mean(dim=0) for el in X])

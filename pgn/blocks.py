@@ -50,7 +50,8 @@ class NodeBlock(Block):
                         out_aggregated.append(self._out_e2n_aggregators[at](agg_input))
 
                 # TODO the dims should be [node, aggregated features], check this thoroughly
-                aggregated = torch.cat(aggregated, dim=1)
+                aggregated = torch.cat(in_aggregated + out_aggregated, dim=1)
+
                 if isinstance(G, pg.DirectedGraphWithContext):
                     to_updater = torch.stack([torch.cat([aggregated[nid], vdata[t][nid], G.context_data(concat=True)]) for nid in range(G.num_vertices(t))])
                 else:
