@@ -21,10 +21,11 @@ class Block(nn.Module):
 
 
 class NodeBlock(Block):
-    def __init__(self, updaters=None, e2n_aggregators=None):
-        super().__init__(e2n_aggregators is None)
+    def __init__(self, updaters=None, in_e2n_aggregators=None, out_e2n_aggregators=None):
+        super().__init__(in_e2n_aggregators is None and out_e2n_aggregators is None)
         self._updaters = updaters
-        self._e2n_aggregators = e2n_aggregators
+        self._in_e2n_aggregators = in_e2n_aggregators
+        self._out_e2n_aggregators = out_e2n_aggregators
 
     def forward(self, G):
         out = {}
@@ -35,14 +36,22 @@ class NodeBlock(Block):
             if self.independent:
                 to_updater = vdata[t]
             else:
-                aggregated = {}
-                # TODO rewrite if the order of concat matters
-                for at in self._e2n_aggregators:
-                    agg_input = [edata[at][G.incoming_edges(nid, t)] for nid in range(G.num_vertices(t))]
-                    aggregated[at] = self._e2n_aggregators[at](agg_input)
+                in_aggregated = {}
+                if self._in_e2n_aggregators is not None:
+                    # TODO rewrite if the order of concat matters
+                    for at in self._in_e2n_aggregators:
+                        agg_input = [edata[at][G.incoming_edges(nid, t)] for nid in range(G.num_vertices(t))]
+                        in_aggregated[at] = self._in_e2n_aggregators[at](agg_input)
 
-                    # TODO the dims should be [node, aggregated features]
-                aggregated = torch.cat([el for el in aggregated.values()], dim=1)
+                out_aggregated = {}
+                if self._out_e2n_aggregators is not None:
+                    for at in self._out_e2n_aggregators:
+                        agg_input = [edata[at][G.outgoing_edges(nid, t)] for nid in range(G.num_vertices(t))]
+                        out_aggregated[at] = self._out_e2n_aggregators[at](agg_input)
+
+                aggregated = list(in_aggregated.values()) + list(out_aggregated.values())
+                # TODO the dims should be [node, aggregated features], check this thoroughly
+                aggregated = torch.cat(aggregated, dim=1)
                 if isinstance(G, pg.DirectedGraphWithContext):
                     to_updater = torch.stack([torch.cat([aggregated[nid], vdata[t][nid], G.context_data(concat=True)]) for nid in range(G.num_vertices(t))])
                 else:
@@ -101,6 +110,7 @@ class GlobalBlock(Block):
         self._vertex_aggregators = vertex_aggregators
         self._edge_aggregators = edge_aggregators
         self._updaters = updaters
+        # TODO Implement outgoing aggregators for the release
 
     def forward(self, G):
         out = {}
