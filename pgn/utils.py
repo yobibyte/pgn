@@ -1,8 +1,9 @@
 import networkx as nx
 from networkx.drawing.nx_agraph import to_agraph
-
 import torch
 from pgn.graph import DirectedEdge, DirectedGraph, Vertex
+
+EDGE_COLOURS = {'edge': 'black', 'action': 'black', 'relation':'orange'}
 
 def generate_graph():
     vinfo = [Vertex(id=i) for i in range(2)]
@@ -20,17 +21,20 @@ def generate_graph():
 
 def pgn2nx(ig):
     G = nx.MultiDiGraph()
+    for t, vinfo in ig.vertex_info().items():
+        for v in vinfo:
+            colour = 'black' if v.hidden_info is None or 'colour' not in v.hidden_info else v.hidden_info['colour']
+            label = str(v.id) if v.hidden_info is None or 'label' not in v.hidden_info else v.hidden_info['label'] + ', v.id:' + str(v.id)
+            G.add_node((v.type, v.id), color=colour, label=label)
 
-    for v in ig.vertex_info('vertex'):
-        G.add_node(v.id)
-
-    for e in ig.edge_info('edge'):
-        G.add_edge(e.sender.id, e.receiver.id, key=e.id)
-
+    for t, einfo in ig.edge_info().items():
+        for e in einfo:
+            colour = 'black' if e.type not in EDGE_COLOURS else EDGE_COLOURS[e.type]
+            G.add_edge((e.sender.type, e.sender.id), (e.receiver.type, e.receiver.id), color=colour)
     pos = nx.spring_layout(G)
 
     for n in G.node:
-        G.node[n].update({'pos': pos[n]})
+        G.node[n].update({'pos': pos[n], })
     return G
 
 def plot_graph(g, fname='graph.pdf'):
@@ -38,15 +42,16 @@ def plot_graph(g, fname='graph.pdf'):
 
     # add graphviz layout options (see https://stackoverflow.com/a/39662097)
     g.graph['edge'] = {'arrowsize': '0.6', 'splines': 'curved'}
+    g.graph['node'] = {'shape': 'box'}
     g.graph['graph'] = {'scale': '3'}
 
     # adding attributes to edges in multigraphs is more complicated but see
     # https://stackoverflow.com/a/26694158
-    #g[1][0][2].update({'color': 'red'})
 
     a = to_agraph(g)
     a.layout('dot')
     a.draw(fname)
+
 
 if __name__ == '__main__':
     g = generate_graph()

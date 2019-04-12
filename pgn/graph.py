@@ -24,7 +24,7 @@ class Entity(object):
 
 class DirectedEdge(Entity):
     def __init__(self, id, sender, receiver, type='edge', hidden_info=None):
-        super().__init__(id, type)
+        super().__init__(id, type, hidden_info=hidden_info)
         self._sender = sender
         self._receiver = receiver
 
@@ -38,16 +38,18 @@ class DirectedEdge(Entity):
 
 class Vertex(Entity):
     def __init__(self, id, type='vertex', hidden_info=None):
-        super().__init__(id, type)
+        super().__init__(id, type, hidden_info=hidden_info)
 
 
 class Context(Entity):
     def __init__(self, id, type='context', hidden_info=None):
-        super().__init__(id, type)
+        super().__init__(id, type, hidden_info=hidden_info)
 
 
 class DirectedGraph(object):
     def __init__(self, entities):
+
+
         # entities is a dict, where the key stands for the entity type,
         # and the value is the dict with the 'data' and 'info' which has a list of all the entities where their index
         # in the array corresponds to the index in the fist dimension of the data tensor
@@ -56,8 +58,10 @@ class DirectedGraph(object):
         self._vertices = {el['info'][0].type: el for el in entities if isinstance(el['info'][0], Vertex)}
         self._edges = {el['info'][0].type: el for el in entities if isinstance(el['info'][0], DirectedEdge)}
 
-
         for t, v in self._vertices.items():
+            if not isinstance(v['data'], torch.Tensor):
+                v['data'] = torch.Tensor(v['data'])
+
             for vid, el in enumerate(v['info']):
                 if vid != el.id:
                     raise ValueError("The vertex with index {} should be a {}-th element in the vertex array of type {}".format(el.id, el.id, t))
@@ -67,6 +71,9 @@ class DirectedGraph(object):
                                  "from the number of edges in the 'info' list" % t)
 
         for t, v in self._edges.items():
+            if not isinstance(v['data'], torch.Tensor):
+                v['data'] = torch.Tensor(v['data'])
+
             for eid, el in enumerate(v['info']):
                 if eid != el.id:
                     raise ValueError("The edge with index {} should be a {}-th element in the edge array of type {}".format(el.id, el.id, t))
