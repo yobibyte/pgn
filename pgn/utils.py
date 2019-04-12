@@ -25,7 +25,7 @@ def pgn2nx(ig):
     for t, vinfo in ig.vertex_info().items():
         for v in vinfo:
             colour = 'black' if v.hidden_info is None or 'colour' not in v.hidden_info else v.hidden_info['colour']
-            label = str(v.id) if v.hidden_info is None or 'label' not in v.hidden_info else v.hidden_info['label'] + ', v.id:' + str(v.id)
+            label = str(v.id) if v.hidden_info is None or 'label' not in v.hidden_info else 'v.id: {},\n'.format(v.id) + str(v.hidden_info)#v.hidden_info['label'] + ', v.id:' + str(v.id)
             G.add_node((v.type, v.id), color=colour, label=label)
 
     for t, einfo in ig.edge_info().items():
