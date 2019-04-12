@@ -4,6 +4,7 @@ import torch
 from pgn.graph import DirectedEdge, DirectedGraph, Vertex
 
 EDGE_COLOURS = {'edge': 'black', 'action': 'black', 'relation':'orange'}
+LAYOUTS = ['neato', 'dot', 'twopi', 'circo', 'fdp', 'sfdp']
 
 def generate_graph():
     vinfo = [Vertex(id=i) for i in range(2)]
@@ -43,13 +44,13 @@ def plot_graph(g, fname='graph.pdf'):
     # add graphviz layout options (see https://stackoverflow.com/a/39662097)
     g.graph['edge'] = {'arrowsize': '0.6', 'splines': 'curved'}
     g.graph['node'] = {'shape': 'box'}
-    g.graph['graph'] = {'scale': '3'}
+    g.graph['graph'] = {'scale': '1'}
 
     # adding attributes to edges in multigraphs is more complicated but see
     # https://stackoverflow.com/a/26694158
 
     a = to_agraph(g)
-    a.layout('dot')
+    a.layout('circo')
     a.draw(fname)
 
 
