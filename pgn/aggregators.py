@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 
-#TODO ideally, we would like all our inputs to be in the form [batch, time, data_shape]
+
+# TODO ideally, we would like all our inputs to be in the form [batch, time, data_shape]
 # however I'm not sure if it's needed for aggregators since they are are not spread in time: [batch, data_shape]
 
 class Aggregator(nn.Module):
@@ -33,6 +34,7 @@ class Aggregator(nn.Module):
     @property
     def type(self):
         return self._type
+
 
 class MeanAggregator(Aggregator):
     def forward(self, X):

@@ -1,8 +1,8 @@
-from pgn.aggregators import MeanAggregator
 import pgn.graph as pg
 
 import torch
 import torch.nn as nn
+
 
 class Block(nn.Module):
     def __init__(self, independent):
@@ -53,9 +53,12 @@ class NodeBlock(Block):
                 aggregated = torch.cat(in_aggregated + out_aggregated, dim=1)
 
                 if isinstance(G, pg.DirectedGraphWithContext):
-                    to_updater = torch.stack([torch.cat([aggregated[nid], vdata[t][nid], G.context_data(concat=True)]) for nid in range(G.num_vertices(t))])
+                    to_updater = torch.stack(
+                        [torch.cat([aggregated[nid], vdata[t][nid], G.context_data(concat=True)]) for nid in
+                         range(G.num_vertices(t))])
                 else:
-                    to_updater = torch.stack([torch.cat([aggregated[nid], vdata[t][nid]]) for nid in range(G.num_vertices(t))])
+                    to_updater = torch.stack(
+                        [torch.cat([aggregated[nid], vdata[t][nid]]) for nid in range(G.num_vertices(t))])
 
             if t not in self._updaters:
                 out[t] = to_updater
@@ -130,6 +133,7 @@ class GlobalBlock(Block):
             else:
                 out[t] = self._updaters[t](upd_input)
         return out
+
 
 class GraphNetwork(nn.Module):
     def __init__(self, node_block=None, edge_block=None, global_block=None):

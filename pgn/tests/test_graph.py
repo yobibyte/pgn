@@ -1,13 +1,13 @@
 import unittest
 
+import torch
 from pgn import graph
 from pgn.graph import Vertex, DirectedEdge
-import torch
+
 
 class TestGraph(unittest.TestCase):
 
     def setUp(self):
-
         vinfo = [Vertex(id=i) for i in range(2)]
         vertices = {'data': torch.Tensor([[0], [1]]), 'info': vinfo}
 
@@ -21,7 +21,6 @@ class TestGraph(unittest.TestCase):
         self.g = graph.DirectedGraph([vertices, edges])
 
     def test_graph_build(self):
-
         self.assertEqual(self.g.vertex_data()['vertex'][0], 0)
         self.assertEqual(self.g.vertex_data()['vertex'][1], 1)
 

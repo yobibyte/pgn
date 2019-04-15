@@ -3,17 +3,16 @@ My implementation of sorting with graph networks (GNs) in pytorch.
 Original tf implementation here: https://github.com/deepmind/graph_nets/blob/master/graph_nets/demos/sort.ipynb
 """
 
+import argparse
 import itertools
 
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
-
 from pgn.graph import DirectedGraphWithContext, Vertex, DirectedEdge, Context
 from pgn.models import EncoderCoreDecoder
-import argparse
 
-import numpy as np
-import matplotlib.pyplot as plt
 
 def graph_from_list(input_list):
     """
@@ -33,7 +32,8 @@ def graph_from_list(input_list):
         {'data': torch.Tensor([[v] for v in input_list]),
          'info': vertices},
         {'data': torch.zeros(len(connectivity), 1),
-         'info': [DirectedEdge(i, vertices[connectivity[i][0]], vertices[connectivity[i][1]]) for i in range(len(connectivity))]},
+         'info': [DirectedEdge(i, vertices[connectivity[i][0]], vertices[connectivity[i][1]]) for i in
+                  range(len(connectivity))]},
         {'data': torch.Tensor([0]), 'info': [Context(0)]}
     ]
 
@@ -115,10 +115,10 @@ if __name__ == '__main__':
         train_loss = model.process_batch(train_input_graphs, train_target_graphs, criterion)
         train_loss.backward()
         optimiser.step()
-        if e % args.eval_freq == 0 or e == args.epochs-1:
+        if e % args.eval_freq == 0 or e == args.epochs - 1:
             eval_loss = model.process_batch(eval_input_graphs, eval_target_graphs, criterion, compute_grad=False)
             print("Epoch %d, mean training loss: %f, mean evaluation loss: %f."
-                  % (e, train_loss.item()/args.num_train, eval_loss.item()/args.num_train))
+                  % (e, train_loss.item() / args.num_train, eval_loss.item() / args.num_train))
 
     unsorted = np.random.uniform(size=args.sample_length)
     test_g = graph_from_list(unsorted)

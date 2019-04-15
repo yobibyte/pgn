@@ -1,8 +1,7 @@
 import torch.nn as nn
-
+from pgn.aggregators import MeanAggregator
 from pgn.blocks import NodeBlock, EdgeBlock, GlobalBlock, GraphNetwork
 from pgn.graph import DirectedGraphWithContext
-from pgn.aggregators import MeanAggregator
 
 
 def get_mlp(input_size, units, activation=nn.ReLU):
@@ -15,9 +14,9 @@ def get_mlp(input_size, units, activation=nn.ReLU):
     nn.LayerNorm(inpt_size)
     return nn.Sequential(*arch)
 
+
 def get_mlp_updaters(input_node_size, output_node_size, input_edge_size, output_edge_size,
                      input_global_size=None, output_global_size=None, independent=False):
-
     with_global = False if (input_global_size is None or output_global_size is None) else True
 
     if not with_global and input_global_size != output_global_size:
@@ -33,7 +32,7 @@ def get_mlp_updaters(input_node_size, output_node_size, input_edge_size, output_
             input_global_size = output_global_size = 0
         edge_updater = get_mlp(input_edge_size + 2 * input_node_size + input_global_size, [16, output_edge_size])
         node_updater = get_mlp(input_node_size + output_edge_size + input_global_size, [16, output_node_size])
-        global_updater = get_mlp(input_global_size + output_edge_size + output_node_size, [16, output_global_size])  \
+        global_updater = get_mlp(input_global_size + output_edge_size + output_node_size, [16, output_global_size]) \
             if with_global else None
     return node_updater, edge_updater, global_updater
 
@@ -52,27 +51,30 @@ class EncoderCoreDecoder(object):
                                                                                   independent=True)
 
         self.encoder = GraphNetwork(NodeBlock({'vertex': enc_node_updater}),
-                               EdgeBlock({'edge': enc_edge_updater}, independent=True),
-                               GlobalBlock({'context': enc_global_updater}) if enc_global_updater else None)
+                                    EdgeBlock({'edge': enc_edge_updater}, independent=True),
+                                    GlobalBlock({'context': enc_global_updater}) if enc_global_updater else None)
 
         core_node_updater, core_edge_updater, core_global_updater = get_mlp_updaters(*core_vertex_shape,
-                                                                                  *core_edge_shape,
-                                                                                  *core_global_shape,
-                                                                                  independent=False)
+                                                                                     *core_edge_shape,
+                                                                                     *core_global_shape,
+                                                                                     independent=False)
 
         self.core = GraphNetwork(NodeBlock({'vertex': core_node_updater}, {'edge': MeanAggregator()}),
-                            EdgeBlock({'edge': core_edge_updater}),
-                            GlobalBlock({'context': core_global_updater}, {'vertex': MeanAggregator()},
-                                        {'edge': MeanAggregator()}) if core_global_updater else None)
+                                 EdgeBlock({'edge': core_edge_updater}),
+                                 GlobalBlock({'context': core_global_updater}, {'vertex': MeanAggregator()},
+                                             {'edge': MeanAggregator()}) if core_global_updater else None)
 
         dec_node_updater, dec_edge_updater, dec_global_updater = get_mlp_updaters(*dec_vertex_shape,
                                                                                   *dec_edge_shape,
                                                                                   *dec_global_shape,
                                                                                   independent=True)
-        self.decoder = GraphNetwork(NodeBlock({'vertex': nn.Sequential(dec_node_updater, nn.Linear(dec_vertex_shape[-1], out_vertex_size))}),
-                               EdgeBlock({'edge': nn.Sequential(dec_edge_updater, nn.Linear(dec_edge_shape[-1], out_edge_size))}, independent=True),
-                               GlobalBlock({'context': nn.Sequential(dec_global_updater, nn.Linear(dec_global_shape[-1], out_global_size))}) if dec_global_updater else None,
-                               )
+        self.decoder = GraphNetwork(
+            NodeBlock({'vertex': nn.Sequential(dec_node_updater, nn.Linear(dec_vertex_shape[-1], out_vertex_size))}),
+            EdgeBlock({'edge': nn.Sequential(dec_edge_updater, nn.Linear(dec_edge_shape[-1], out_edge_size))},
+                      independent=True),
+            GlobalBlock({'context': nn.Sequential(dec_global_updater, nn.Linear(dec_global_shape[-1],
+                                                                                out_global_size))}) if dec_global_updater else None,
+            )
 
     @property
     def parameters(self):
