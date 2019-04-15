@@ -161,4 +161,7 @@ class GraphNetwork(nn.Module):
         return G
 
     def parameters(self, recurse=True):
-        return self._node_block.parameters() + self._edge_block.parameters() + self._global_block.parameters()
+        node_params = self._node_block.parameters() if self._node_block is not None else []
+        edge_params = self._edge_block.parameters() if self._edge_block is not None else []
+        context_params = self._global_block.parameters() if self._global_block is not None else []
+        return node_params + edge_params + context_params

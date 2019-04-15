@@ -11,6 +11,7 @@ import torch.nn as nn
 from pgn.graph import DirectedGraphWithContext, Vertex, DirectedEdge, Context
 from pgn.blocks import NodeBlock, EdgeBlock, GlobalBlock, GraphNetwork
 from pgn.aggregators import MeanAggregator
+from pgn.models import get_mlp_updaters
 
 import argparse
 
@@ -72,35 +73,6 @@ def create_target_graph(input_graph):
     return target_graph
 
 
-def get_mlp(input_size, units, activation=nn.ReLU):
-    arch = []
-    inpt_size = input_size
-    for l in units:
-        arch.append(nn.Linear(inpt_size, l))
-        arch.append(activation())
-        inpt_size = l
-    nn.LayerNorm(inpt_size)
-    return nn.Sequential(*arch)
-
-
-def get_mlp_updaters(input_node_size,
-             input_edge_size,
-             input_global_size,
-             output_node_size,
-             output_edge_size,
-             output_global_size,
-             independent):
-    if independent:
-        edge_updater = get_mlp(input_edge_size, [16, output_edge_size])
-        node_updater = get_mlp(input_node_size, [16, output_node_size])
-        global_updater = get_mlp(input_global_size, [16, output_global_size])
-    else:
-        # no aggregation of the outgoing for this example
-        edge_updater = get_mlp(input_edge_size + 2*input_node_size + input_global_size, [16, output_edge_size])
-        node_updater = get_mlp(input_node_size + output_edge_size + input_global_size, [16, output_node_size])
-        global_updater = get_mlp(input_global_size + output_edge_size + output_node_size, [16, output_global_size])
-    return node_updater, edge_updater, global_updater
-
 def forward(input_g, encoder, core, decoder, core_steps):
     input_copy = input_g.get_copy()
     latent = encoder(input_copy)
@@ -155,12 +127,12 @@ if __name__ == '__main__':
     eval_input_graphs, eval_target_graphs = generate_graph_batch(args.num_train, sample_length=args.sample_length)
 
 
-    enc_node_updater, enc_edge_updater, enc_global_updater = get_mlp_updaters(1, 1, 1, 16, 16, 16, independent=True)
+    enc_node_updater, enc_edge_updater, enc_global_updater = get_mlp_updaters(1, 16, 1, 16, 1, 16, independent=True)
     encoder = GraphNetwork(NodeBlock({'vertex': enc_node_updater}),
                            EdgeBlock({'edge': enc_edge_updater}, independent=True),
                            GlobalBlock({'context': enc_global_updater}))
 
-    core_node_updater, core_edge_updater, core_global_updater = get_mlp_updaters(32, 32, 32, 16, 16, 16, independent=False)
+    core_node_updater, core_edge_updater, core_global_updater = get_mlp_updaters(32, 16, 32, 16, 32, 16, independent=False)
     core = GraphNetwork(NodeBlock({'vertex':core_node_updater}, {'edge': MeanAggregator()}),
                         EdgeBlock({'edge':core_edge_updater}),
                         GlobalBlock({'context':core_global_updater}, {'vertex': MeanAggregator()}, {'edge': MeanAggregator()}))
@@ -170,7 +142,6 @@ if __name__ == '__main__':
                            EdgeBlock({'edge':nn.Sequential(dec_edge_updater, nn.Linear(16, 2))}, independent=True),
                            GlobalBlock({'context':nn.Sequential(dec_global_updater, nn.Linear(16, 2))}),
                            )
-    models = [encoder] + [core] * args.core_steps + [decoder]
 
     criterion = nn.BCEWithLogitsLoss()
 
