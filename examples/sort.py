@@ -9,10 +9,7 @@ import torch
 import torch.nn as nn
 
 from pgn.graph import DirectedGraphWithContext, Vertex, DirectedEdge, Context
-from pgn.blocks import NodeBlock, EdgeBlock, GlobalBlock, GraphNetwork
-from pgn.aggregators import MeanAggregator
-from pgn.models import get_mlp_updaters
-
+from pgn.models import EncoderCoreDecoder
 import argparse
 
 import numpy as np
@@ -73,17 +70,6 @@ def create_target_graph(input_graph):
     return target_graph
 
 
-def forward(input_g, encoder, core, decoder, core_steps):
-    input_copy = input_g.get_copy()
-    latent = encoder(input_copy)
-    latent0 = latent.get_copy()
-    output = []
-    for s in range(core_steps):
-        concatenated = DirectedGraphWithContext.concat([latent0, latent])
-        latent = core(concatenated)
-        output.append(decoder(latent))
-    return output
-
 def generate_graph_batch(n_examples, sample_length, target=True):
     input_graphs = [graph_from_list(np.random.uniform(size=sample_length)) for _ in range(n_examples)]
     target_graphs = [create_target_graph(g) for g in input_graphs] if target else None
@@ -92,25 +78,6 @@ def generate_graph_batch(n_examples, sample_length, target=True):
     else:
         return input_graphs
 
-def process_batch(encoder, core, decoder, core_steps, input_graphs, target_graphs, compute_grad=True):
-    if not compute_grad:
-        encoder.eval()
-        core.eval()
-        decoder.eval()
-
-    node_loss = 0
-    edge_loss = 0
-    for input_g, target_g in zip(input_graphs, target_graphs):
-        g_out = forward(input_g, encoder, core, decoder, core_steps)
-        node_loss += sum([criterion(g.vertex_data('vertex'), target_g.vertex_data('vertex')) for g in g_out])
-        edge_loss += sum([criterion(g.edge_data('edge'), target_g.edge_data('edge')) for g in g_out])
-    loss = node_loss + edge_loss
-
-    if not compute_grad:
-        encoder.train()
-        core.train()
-        decoder.train()
-    return loss
 
 if __name__ == '__main__':
 
@@ -126,47 +93,37 @@ if __name__ == '__main__':
     train_input_graphs, train_target_graphs = generate_graph_batch(args.num_train, sample_length=args.sample_length)
     eval_input_graphs, eval_target_graphs = generate_graph_batch(args.num_train, sample_length=args.sample_length)
 
-
-    enc_node_updater, enc_edge_updater, enc_global_updater = get_mlp_updaters(1, 16, 1, 16, 1, 16, independent=True)
-    encoder = GraphNetwork(NodeBlock({'vertex': enc_node_updater}),
-                           EdgeBlock({'edge': enc_edge_updater}, independent=True),
-                           GlobalBlock({'context': enc_global_updater}))
-
-    core_node_updater, core_edge_updater, core_global_updater = get_mlp_updaters(32, 16, 32, 16, 32, 16, independent=False)
-    core = GraphNetwork(NodeBlock({'vertex':core_node_updater}, {'edge': MeanAggregator()}),
-                        EdgeBlock({'edge':core_edge_updater}),
-                        GlobalBlock({'context':core_global_updater}, {'vertex': MeanAggregator()}, {'edge': MeanAggregator()}))
-
-    dec_node_updater, dec_edge_updater, dec_global_updater = get_mlp_updaters(16, 16, 16, 16, 16, 16, independent=True)
-    decoder = GraphNetwork(NodeBlock({'vertex':nn.Sequential(dec_node_updater, nn.Linear(16, 2))}),
-                           EdgeBlock({'edge':nn.Sequential(dec_edge_updater, nn.Linear(16, 2))}, independent=True),
-                           GlobalBlock({'context':nn.Sequential(dec_global_updater, nn.Linear(16, 2))}),
-                           )
-
+    model = EncoderCoreDecoder(args.core_steps,
+                               enc_vertex_shape=(1, 16),
+                               core_vertex_shape=(32, 16),
+                               dec_vertex_shape=(16, 16),
+                               out_vertex_size=2,
+                               enc_edge_shape=(1, 16),
+                               core_edge_shape=(32, 16),
+                               dec_edge_shape=(16, 16),
+                               out_edge_size=2,
+                               enc_global_shape=(1, 16),
+                               core_global_shape=(32, 16),
+                               dec_global_shape=(16, 16),
+                               out_global_size=2,
+                               )
+    optimiser = torch.optim.Adam(lr=0.001, params=model.parameters)
     criterion = nn.BCEWithLogitsLoss()
 
-    parameters = []
-    for el in [encoder, core, decoder]:
-        for plist in el.parameters():
-            parameters.extend(list(plist))
-    optimiser = torch.optim.Adam(lr=0.001, params=parameters)
-
-    # train
     for e in range(args.epochs):
         optimiser.zero_grad()
-        train_loss = process_batch(encoder, core, decoder, args.core_steps, train_input_graphs, train_target_graphs)
+        train_loss = model.process_batch(train_input_graphs, train_target_graphs, criterion)
         train_loss.backward()
         optimiser.step()
         if e % args.eval_freq == 0 or e == args.epochs-1:
-            eval_loss = process_batch(encoder, core, decoder, args.core_steps, eval_input_graphs, eval_target_graphs,
-                                      compute_grad=False)
+            eval_loss = model.process_batch(eval_input_graphs, eval_target_graphs, criterion, compute_grad=False)
             print("Epoch %d, mean training loss: %f, mean evaluation loss: %f."
                   % (e, train_loss.item()/args.num_train, eval_loss.item()/args.num_train))
 
     unsorted = np.random.uniform(size=args.sample_length)
     test_g = graph_from_list(unsorted)
     test_g.set_context_data(torch.Tensor([0]))
-    g = forward(test_g, encoder, core, decoder, args.core_steps)[-1]
+    g = model.forward(test_g, args.core_steps)[-1]
 
     # evaluate and plot
     mx = np.zeros((len(unsorted), len(unsorted)))
@@ -178,5 +135,6 @@ if __name__ == '__main__':
     try:
         plt.show()
     except:
-        print("Wasn't able to show the plot. But I'll save it.")
-    plt.savefig('pgn_sorting_output.png')
+        print("Wasn't able to show the plot. But I'll save it for sure.")
+    finally:
+        plt.savefig('pgn_sorting_output.png')

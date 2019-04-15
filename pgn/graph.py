@@ -49,7 +49,6 @@ class Context(Entity):
 class DirectedGraph(object):
     def __init__(self, entities):
 
-
         # entities is a dict, where the key stands for the entity type,
         # and the value is the dict with the 'data' and 'info' which has a list of all the entities where their index
         # in the array corresponds to the index in the fist dimension of the data tensor
