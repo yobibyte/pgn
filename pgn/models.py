@@ -1,4 +1,5 @@
 import torch.nn as nn
+
 from pgn.aggregators import MeanAggregator
 from pgn.blocks import NodeBlock, EdgeBlock, GlobalBlock, GraphNetwork
 from pgn.graph import DirectedGraphWithContext
@@ -76,11 +77,10 @@ class EncoderCoreDecoder(object):
                                                                                 out_global_size))}) if dec_global_updater else None,
             )
 
-    @property
-    def parameters(self):
+    def parameters(self, recurse=True):
         params = []
         for el in [self.encoder, self.core, self.decoder]:
-            for plist in el.parameters():
+            for plist in el.parameters(recurse):
                 params.extend(list(plist))
         return params
 
@@ -109,7 +109,7 @@ class EncoderCoreDecoder(object):
         node_loss = 0
         edge_loss = 0
         for input_g, target_g in zip(input_graphs, target_graphs):
-            g_out = self.forward(input_g)
+            g_out = self.forward(input_g, output_all_steps=True)
             node_loss += sum([criterion(g.vertex_data('vertex'), target_g.vertex_data('vertex')) for g in g_out])
             edge_loss += sum([criterion(g.edge_data('edge'), target_g.edge_data('edge')) for g in g_out])
         loss = node_loss + edge_loss

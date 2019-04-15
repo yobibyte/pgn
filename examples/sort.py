@@ -107,7 +107,7 @@ if __name__ == '__main__':
                                dec_global_shape=(16, 16),
                                out_global_size=2,
                                )
-    optimiser = torch.optim.Adam(lr=0.001, params=model.parameters)
+    optimiser = torch.optim.Adam(lr=0.001, params=model.parameters())
     criterion = nn.BCEWithLogitsLoss()
 
     for e in range(args.epochs):
