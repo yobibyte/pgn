@@ -86,17 +86,14 @@ class EncoderCoreDecoder(object):
 
     def forward(self, input_g, output_all_steps=False):
         input_copy = input_g.get_copy()
-        print('encoder forward')
         latent = self.encoder(input_copy)
         latent0 = latent.get_copy()
         output = []
         for s in range(self._core_steps):
             concatenated = latent0.__class__.concat([latent0, latent])
 
-            print('core forward')
             latent = self.core(concatenated)
             if output_all_steps or s + 1 == self._core_steps:
-                print('decoder forward')
                 output.append(self.decoder(latent))
 
         if output_all_steps:

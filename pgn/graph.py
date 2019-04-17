@@ -195,20 +195,15 @@ class DirectedGraph(object):
             # list of dicts of lists here
             incoming = []
             for v_id in range(self.num_vertices(vertex_type)):
-                curr_v = []
+                curr_v = {}
                 for k, v in self._edges.items():
-                    curr_v.append(
-                        {k: [el.id for el in v['info'] if el.receiver.id == v_id and el.receiver.type == vertex_type]})
-                if self.num_edge_types == 1:
-                    curr_v = curr_v[0][self.default_edge_type]
+                    curr_v[k] = [el.id for el in v['info'] if el.receiver.id == v_id and el.receiver.type == vertex_type]
                 incoming.append(curr_v)
         else:
             # dict of lists here
             incoming = {}
             for k, v in self._edges.items():
                 incoming[k] = [el.id for el in v['info'] if el.receiver.id == id and el.receiver.type == vertex_type]
-            if self.num_edge_types == 1:
-                return incoming[self.default_edge_type]
         return incoming
 
     def outgoing_edges(self, id=None, vertex_type=None):
@@ -217,20 +212,14 @@ class DirectedGraph(object):
         if id is None:
             outgoing = []
             for v_id in range(self.num_vertices(vertex_type)):
-                curr_v = []
+                curr_v = {}
                 for k, v in self._edges.items():
-                    curr_v.append(
-                        {k: [el.id for el in v['info'] if el.sender.id == v_id and el.sender.type == vertex_type]})
-                if self.num_edge_types == 1:
-                    curr_v = curr_v[0][self.default_edge_type]
+                    curr_v[k] = [el.id for el in v['info'] if el.sender.id == v_id and el.sender.type == vertex_type]
                 outgoing.append(curr_v)
         else:
             outgoing = {}
             for k, v in self._edges.items():
                 outgoing[k] = [el.id for el in v['info'] if el.sender.id == id and el.sender.type == vertex_type]
-            if self.num_edge_types == 1:
-                return outgoing[self.default_edge_type]
-
         return outgoing
 
     @property
