@@ -120,4 +120,8 @@ class EncoderCoreDecoder(object):
             self.core.train()
             self.decoder.train()
         return loss
-
+    
+    def to(self, device):
+        self.encoder.to(device)
+        self.core.to(device)
+        self.decoder.to(device)

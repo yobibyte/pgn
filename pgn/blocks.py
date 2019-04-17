@@ -51,7 +51,7 @@ class NodeBlock(Block):
 
                 # TODO the dims should be [node, aggregated features], check this thoroughly
                 aggregated = torch.cat(in_aggregated + out_aggregated, dim=1)
-
+                
                 if isinstance(G, pg.DirectedGraphWithContext):
                     to_updater = torch.stack(
                         [torch.cat([aggregated[nid], vdata[t][nid], G.context_data(concat=True)]) for nid in
@@ -66,6 +66,10 @@ class NodeBlock(Block):
                 out[t] = self._updaters[t](to_updater)
 
         return out
+
+    def to(self, device):
+        for el in self._updaters.values():
+            el.to(device)
 
 
 class EdgeBlock(Block):
@@ -101,6 +105,10 @@ class EdgeBlock(Block):
                 out[et] = self._updaters[et](updater_input)
         return out
 
+    def to(self, device):
+        for el in self._updaters.values():
+            el.to(device)
+
 
 class GlobalBlock(Block):
     def __init__(self, updaters=None, vertex_aggregators=None, edge_aggregators=None):
@@ -133,6 +141,10 @@ class GlobalBlock(Block):
             else:
                 out[t] = self._updaters[t](upd_input)
         return out
+    
+    def to(self, device):
+        for el in self._updaters.values():
+            el.to(device)
 
 
 class GraphNetwork(nn.Module):
@@ -169,3 +181,11 @@ class GraphNetwork(nn.Module):
         edge_params = self._edge_block.parameters() if self._edge_block is not None else []
         context_params = self._global_block.parameters() if self._global_block is not None else []
         return node_params + edge_params + context_params
+
+    def to(self, device):
+        if self._node_block is not None:
+            self._node_block.to(device)
+        if self._edge_block is not None:
+            self._edge_block.to(device)
+        if self._global_block is not None:
+            self._global_block.to(device)

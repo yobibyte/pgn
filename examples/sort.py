@@ -93,6 +93,7 @@ if __name__ == '__main__':
     train_input_graphs, train_target_graphs = generate_graph_batch(args.num_train, sample_length=args.sample_length)
     eval_input_graphs, eval_target_graphs = generate_graph_batch(args.num_train, sample_length=args.sample_length)
 
+
     model = EncoderCoreDecoder(args.core_steps,
                                enc_vertex_shape=(1, 16),
                                core_vertex_shape=(32, 16),
@@ -107,6 +108,14 @@ if __name__ == '__main__':
                                dec_global_shape=(16, 16),
                                out_global_size=2,
                                )
+    if torch.cuda.is_available():
+        for el in train_input_graphs:
+            el.to('cuda')
+        for el in train_target_graphs:
+            el.to('cuda')
+    
+        model.to('cuda')
+
     optimiser = torch.optim.Adam(lr=0.001, params=model.parameters())
     criterion = nn.BCEWithLogitsLoss()
 
