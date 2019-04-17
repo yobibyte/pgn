@@ -188,10 +188,12 @@ class DirectedGraph(object):
             return self._edges[edge_type]['info'][id].receiver
 
     def incoming_edges(self, id=None, vertex_type=None):
+        #TODO implement 'all' for vertex_type and make it reserved key for the dict
         vertex_type = self.default_vertex_type if vertex_type is None else vertex_type
-        incoming = []
 
         if id is None:
+            # list of dicts of lists here
+            incoming = []
             for v_id in range(self.num_vertices(vertex_type)):
                 curr_v = []
                 for k, v in self._edges.items():
@@ -201,18 +203,19 @@ class DirectedGraph(object):
                     curr_v = curr_v[0][self.default_edge_type]
                 incoming.append(curr_v)
         else:
+            # dict of lists here
+            incoming = {}
             for k, v in self._edges.items():
-                incoming.append(
-                    {k: [el.id for el in v['info'] if el.receiver.id == id and el.receiver.type == vertex_type]})
+                incoming[k] = [el.id for el in v['info'] if el.receiver.id == id and el.receiver.type == vertex_type]
             if self.num_edge_types == 1:
-                return incoming[0][self.default_edge_type]
+                return incoming[self.default_edge_type]
         return incoming
 
     def outgoing_edges(self, id=None, vertex_type=None):
         vertex_type = self.default_vertex_type if vertex_type is None else vertex_type
-        outgoing = []
 
         if id is None:
+            outgoing = []
             for v_id in range(self.num_vertices(vertex_type)):
                 curr_v = []
                 for k, v in self._edges.items():
@@ -222,11 +225,11 @@ class DirectedGraph(object):
                     curr_v = curr_v[0][self.default_edge_type]
                 outgoing.append(curr_v)
         else:
+            outgoing = {}
             for k, v in self._edges.items():
-                outgoing.append(
-                    {k: [el.id for el in v['info'] if el.sender.id == id and el.sender.type == vertex_type]})
+                outgoing[k] = [el.id for el in v['info'] if el.sender.id == id and el.sender.type == vertex_type]
             if self.num_edge_types == 1:
-                return outgoing[0][self.default_edge_type]
+                return outgoing[self.default_edge_type]
 
         return outgoing
 
@@ -293,7 +296,8 @@ class DirectedGraph(object):
     def get_graph_with_same_topology(self):
         return self.__class__(self.get_entities(zero_data=True))
 
-    def concat(graph_list):
+    @classmethod
+    def concat(cls, graph_list):
         """
         Concatenate features of the directed graphs with the same topology
         Parameters
@@ -304,6 +308,8 @@ class DirectedGraph(object):
         -------
         A concatenated graph
         """
+
+        assert all([el.__class__ == cls for el in graph_list])
 
         if len(graph_list) == 0:
             raise ValueError("Nothing to concatenate. Give me some graphs, man!")
@@ -323,6 +329,12 @@ class DirectedGraph(object):
 
         return res
 
+    def to(self, device):
+        for t, v in self._vertices:
+            v['data'] = v['data'].to(device)
+
+        for t, e in self._edges:
+            e['data'] = e['data'].to(device)
 
 class DirectedGraphWithContext(DirectedGraph):
     def __init__(self, entities):
@@ -333,9 +345,12 @@ class DirectedGraphWithContext(DirectedGraph):
     def context(self):
         return self._context
 
-    def concat(graph_list):
+    @classmethod
+    def concat(cls, graph_list):
         # TODO reuse the code from the parent class as much as possible
         # this is just a temporary (huh) copypaste from the parent class
+
+        assert all([el.__class__ == cls for el in graph_list])
 
         if len(graph_list) == 0:
             raise ValueError("Nothing to concatenate. Give me some graphs, man!")
@@ -391,3 +406,9 @@ class DirectedGraphWithContext(DirectedGraph):
         if len(self._context.keys()) > 1:
             raise ValueError("I have more than one vertex type, you need to provide a type to get the data")
         return next(iter(self._context.keys()))
+
+    def to(self, device):
+        super().to(device)
+
+        for t, c in self._context:
+            c['data'] = c['data'].to(device)
