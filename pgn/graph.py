@@ -319,10 +319,10 @@ class DirectedGraph(object):
         return res
 
     def to(self, device):
-        for t, v in self._vertices:
+        for v in self._vertices.values():
             v['data'] = v['data'].to(device)
 
-        for t, e in self._edges:
+        for e in self._edges.values():
             e['data'] = e['data'].to(device)
 
 class DirectedGraphWithContext(DirectedGraph):
@@ -399,5 +399,5 @@ class DirectedGraphWithContext(DirectedGraph):
     def to(self, device):
         super().to(device)
 
-        for t, c in self._context:
+        for c in self._context.values():
             c['data'] = c['data'].to(device)
