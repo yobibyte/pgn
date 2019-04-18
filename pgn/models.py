@@ -101,23 +101,18 @@ class EncoderCoreDecoder(object):
         else:
             return output[-1]
 
-    def process_batch(self, input_graphs, target_graphs, criterion, compute_grad=True):
+    def process_batch(self, input_graphs, compute_grad=True):
         if not compute_grad:
             self.encoder.eval()
             self.core.eval()
             self.decoder.eval()
 
-        node_loss = 0
-        edge_loss = 0
-        for input_g, target_g in zip(input_graphs, target_graphs):
-            g_out = self.forward(input_g, output_all_steps=True)
-            node_loss += sum([criterion(g.vertex_data('vertex'), target_g.vertex_data('vertex')) for g in g_out])
-            edge_loss += sum([criterion(g.edge_data('edge'), target_g.edge_data('edge')) for g in g_out])
-        loss = node_loss + edge_loss
+        out = [self.forward(input_g, output_all_steps=True) for input_g in input_graphs]
 
         if not compute_grad:
             self.encoder.train()
             self.core.train()
             self.decoder.train()
-        return loss
+
+        return out
 
