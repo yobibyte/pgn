@@ -41,4 +41,9 @@ class MeanAggregator(Aggregator):
         # We can't simply batch this since the sublists can be of unequal length.
         # We either need to do this in a for loop or pad in a smart way
         # (simple padding will affect the average results, for instance).
-        return torch.stack([(super(MeanAggregator, self).forward(el)).mean(dim=0) for el in X])
+        ret = [(super(MeanAggregator, self).forward(el)).mean(dim=0) for el in X]
+        for el in ret:
+            # if the entity has nothing to aggregate, it will be an empty list and will turn into nan after np.mean.
+            # let's make it 0
+            el[el != el] = 0.0
+        return torch.stack(ret)
