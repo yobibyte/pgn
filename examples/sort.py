@@ -6,6 +6,8 @@ Original tf implementation here: https://github.com/deepmind/graph_nets/blob/mas
 import argparse
 import itertools
 
+import time
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -96,6 +98,8 @@ if __name__ == '__main__':
     parser.add_argument('--core-steps', type=int, default=10, help='number of core processing steps')
     parser.add_argument('--sample-length', type=int, default=10, help='number of elements in the list to sort')
     parser.add_argument('--eval-freq', type=int, default=100, help='Evaluation/logging frequency')
+    parser.add_argument('--cuda', action="store_true", help='Use a GPU if the system has it.')
+    parser.add_argument('--verbose', action="store_true", help='Print diagnostircs.')
     args = parser.parse_args()
 
     train_input_graphs, train_target_graphs = generate_graph_batch(args.num_train, sample_length=args.sample_length)
@@ -116,24 +120,33 @@ if __name__ == '__main__':
                                dec_global_shape=(16, 16),
                                out_global_size=2,
                                )
-    if torch.cuda.is_available():
+    if args.cuda and torch.cuda.is_available():
         for el in train_input_graphs:
             el.to('cuda')
         for el in train_target_graphs:
             el.to('cuda')
-    
+        for el in eval_input_graphs:
+            el.to('cuda')
+        for el in eval_target_graphs:
+            el.to('cuda')
         model.to('cuda')
 
     optimiser = torch.optim.Adam(lr=0.001, params=model.parameters())
     criterion = nn.BCEWithLogitsLoss()
 
     for e in range(args.epochs):
+        st_time = time.time()
+
         optimiser.zero_grad()
         train_outs = model.process_batch(train_input_graphs)
         train_loss = batch_loss(train_outs, train_target_graphs, criterion)
         train_loss.backward()
 
         optimiser.step()
+
+        end_time = time.time()
+        if args.verbose:
+            print('Epoch {} is done. {:.2f} sec spent.'.format(e, end_time - st_time))
         if e % args.eval_freq == 0 or e == args.epochs - 1:
             eval_outs = model.process_batch(eval_input_graphs, compute_grad=False)
             eval_loss = batch_loss(eval_outs, eval_target_graphs, criterion)
