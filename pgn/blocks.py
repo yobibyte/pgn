@@ -72,32 +72,51 @@ class EdgeBlock(Block):
         super().__init__(independent)
         self._updaters = nn.ModuleDict(updaters)
 
-    def forward(self, G):
-        out = {}
-        vertex_data = G.vertex_data()
-        for et, edata in G.edge_data().items():
-            einfo = G.edge_info(et)
-            if self._independent:
-                updater_input = edata
-            else:
-                # TODO torch concat along axis 0? or 1?
-                # TODO  pad till largest here
-                if isinstance(G, pg.DirectedGraphWithContext):
-                    inpt = [torch.cat([edata[e],
-                                       vertex_data[einfo[e].receiver.type][einfo[e].receiver.id],
-                                       vertex_data[einfo[e].sender.type][einfo[e].sender.id],
-                                       G.context_data(concat=True)]) for e in range(G.num_edges(et))]
-                else:
-                    inpt = [torch.cat([edata[e],
-                                       vertex_data[einfo[e].receiver.type][einfo[e].receiver.id],
-                                       vertex_data[einfo[e].sender.type][einfo[e].sender.id],
-                                       ]) for e in range(G.num_edges(et))]
-                updater_input = torch.stack(inpt)
+    def forward(self, Gs):
+        # I assume that graphs are homogenious here, i.e. they have the same types of entities,
+        # but that makes sense since the model depends on the graph entities types
 
+        if type(Gs) is not list:
+            Gs = [Gs]
+
+        updater_input_list = []
+
+        for g in Gs:
+            updater_input = {}
+            vertex_data = g.vertex_data()
+            for et, edata in g.edge_data().items():
+                einfo = g.edge_info(et)
+                if self._independent:
+                    updater_input[et] = edata
+                else:
+                    # TODO torch concat along axis 0? or 1?
+                    # TODO pad till largest here
+                    if isinstance(g, pg.DirectedGraphWithContext):
+                        inpt = [torch.cat([edata[e],
+                                           vertex_data[einfo[e].receiver.type][einfo[e].receiver.id],
+                                           vertex_data[einfo[e].sender.type][einfo[e].sender.id],
+                                           g.context_data(concat=True)]) for e in range(g.num_edges(et))]
+                    else:
+                        inpt = [torch.cat([edata[e],
+                                           vertex_data[einfo[e].receiver.type][einfo[e].receiver.id],
+                                           vertex_data[einfo[e].sender.type][einfo[e].sender.id],
+                                           ]) for e in range(g.num_edges(et))]
+                    updater_input[et] = torch.stack(inpt)
+            updater_input_list.append(updater_input)
+
+        out = [{} for _ in range(len(Gs))]
+        for et in Gs[0].edge_types:
             if et not in self._updaters:
-                out[et] = updater_input
+                for inpt_idx, inpt in enumerate(updater_input_list):
+                    out[inpt_idx][et] = inpt[et]
             else:
-                out[et] = self._updaters[et](updater_input)
+                # glue all the inputs for the same type
+                all_inpt = torch.cat([el[et] for el in updater_input_list])
+                # we need these to split after we get the output of a batch
+                input_idx = [el[et].shape[0] for el in updater_input_list]
+                all_inpt = self._updaters[et](all_inpt)
+                for out_idx, el in enumerate(all_inpt.split(input_idx)):
+                    out[out_idx][et] = el
         return out
 
     def to(self, device):
@@ -149,27 +168,30 @@ class GraphNetwork(nn.Module):
         self._edge_block = edge_block
         self._global_block = global_block
 
-    def forward(self, G, modify_input=False):
+    def forward(self, Gs, modify_input=False):
         if not modify_input:
-            G = G.get_copy()
+            Gs = [G.get_copy() for G in Gs]
         # make one pass as in the original paper
 
         # 1. Compute updated edge attributes
         if self._edge_block is not None:
-            G.set_edge_data(self._edge_block(G))
+            edge_outs = self._edge_block(Gs)
+            for i, G in enumerate(Gs):
+                G.set_edge_data(edge_outs[i])
 
-        # 2. Aggregate edge attributes per node
-        # 3. Compute updated node attributes
+        for G in Gs:
+            # 2. Aggregate edge attributes per node
+            # 3. Compute updated node attributes
 
-        if self._node_block is not None:
-            G.set_vertex_data(self._node_block(G))
+            if self._node_block is not None:
+                G.set_vertex_data(self._node_block(G))
 
-        # 4. Aggregate edge attributes globally
-        # 5. Aggregate node attributes globally
-        # 6. Compute updated global attribute
-        if self._global_block is not None:
-            G.set_context_data(self._global_block(G))
-        return G
+            # 4. Aggregate edge attributes globally
+            # 5. Aggregate node attributes globally
+            # 6. Compute updated global attribute
+            if self._global_block is not None:
+                G.set_context_data(self._global_block(G))
+        return Gs
 
     def to(self, device):
         if self._node_block is not None:

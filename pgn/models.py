@@ -77,21 +77,21 @@ class EncoderCoreDecoder(nn.Module):
                                                                                 out_global_size))}) if dec_global_updater else None,
             )
 
-    def forward(self, input_g, output_all_steps=False):
-        input_copy = input_g.get_copy()
-        latent = self.encoder(input_copy)
-        latent0 = latent.get_copy()
-        output = []
+    def forward(self, input_graphs, output_all_steps=False):
+        input_copies = [el.get_copy() for el in input_graphs]
+        latents = self.encoder(input_copies)
+        latents0 = [el.get_copy() for el in latents]
+        outputs = []
         for s in range(self._core_steps):
-            concatenated = latent0.__class__.concat([latent0, latent])
-            latent = self.core(concatenated)
+            concatenated = [latents0[i].__class__.concat([latents0[i], latents[i]]) for i in range(len(input_graphs))]
+            latents = self.core(concatenated)
             if output_all_steps or s + 1 == self._core_steps:
-                output.append(self.decoder(latent))
+                outputs.append(self.decoder(latents))
 
         if output_all_steps:
-            return output
+            return outputs
         else:
-            return output[-1]
+            return [el[-1] for el in outputs]
 
     def process_batch(self, input_graphs, compute_grad=True):
         if not compute_grad:
@@ -99,14 +99,14 @@ class EncoderCoreDecoder(nn.Module):
             self.core.eval()
             self.decoder.eval()
 
-        out = [self.forward(input_g, output_all_steps=True) for input_g in input_graphs]
+        outs = self.forward(input_graphs, output_all_steps=True)
 
         if not compute_grad:
             self.encoder.train()
             self.core.train()
             self.decoder.train()
 
-        return out
+        return outs
     
     def to(self, device):
         self.encoder.to(device)
