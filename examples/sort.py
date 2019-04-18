@@ -78,6 +78,14 @@ def generate_graph_batch(n_examples, sample_length, target=True):
     else:
         return input_graphs
 
+def batch_loss(outs, targets, criterion):
+        node_loss = 0
+        edge_loss = 0
+        for out, target_g in zip(outs, targets):
+            node_loss += sum([criterion(g.vertex_data('vertex'), target_g.vertex_data('vertex')) for g in out])
+            edge_loss += sum([criterion(g.edge_data('edge'), target_g.edge_data('edge')) for g in out])
+        loss = node_loss + edge_loss
+        return loss
 
 if __name__ == '__main__':
 
@@ -121,11 +129,14 @@ if __name__ == '__main__':
 
     for e in range(args.epochs):
         optimiser.zero_grad()
-        train_loss = model.process_batch(train_input_graphs, train_target_graphs, criterion)
+        train_outs = model.process_batch(train_input_graphs)
+        train_loss = batch_loss(train_outs, train_target_graphs, criterion)
         train_loss.backward()
+
         optimiser.step()
         if e % args.eval_freq == 0 or e == args.epochs - 1:
-            eval_loss = model.process_batch(eval_input_graphs, eval_target_graphs, criterion, compute_grad=False)
+            eval_outs = model.process_batch(eval_input_graphs, compute_grad=False)
+            eval_loss = batch_loss(eval_outs, eval_target_graphs, criterion)
             print("Epoch %d, mean training loss: %f, mean evaluation loss: %f."
                   % (e, train_loss.item() / args.num_train, eval_loss.item() / args.num_train))
 
