@@ -40,13 +40,13 @@ class NodeBlock(Block):
                 if self._in_e2n_aggregators is not None:
                     # TODO rewrite if the order of concat matters
                     for at in self._in_e2n_aggregators:
-                        agg_input = [edata[at][G.incoming_edges(nid, t)[at]] for nid in range(G.num_vertices(t))]
+                        agg_input = [edata[at][list(map(lambda x: x.id, G.incoming_edges(nid, t)[at]))] for nid in range(G.num_vertices(t))]
                         in_aggregated.append(self._in_e2n_aggregators[at](agg_input))
 
                 out_aggregated = []
                 if self._out_e2n_aggregators is not None:
                     for at in self._out_e2n_aggregators:
-                        agg_input = [edata[at][G.outgoing_edges(nid, t)[at]] for nid in range(G.num_vertices(t))]
+                        agg_input = [edata[at][list(map(lambda x: x.id, G.outgoing_edges(nid, t)[at]))] for nid in range(G.num_vertices(t))]
                         out_aggregated.append(self._out_e2n_aggregators[at](agg_input))
 
                 # TODO the dims should be [node, aggregated features], check this thoroughly

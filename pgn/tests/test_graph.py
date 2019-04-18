@@ -29,12 +29,12 @@ class TestGraph(unittest.TestCase):
         self.assertEqual(self.g.edge_data()['edge'][2], 2)
 
         # test with id output
-        self.assertEqual(set(self.g.incoming_edges(0)['edge']), {2})
-        self.assertEqual(set(self.g.outgoing_edges(0)['edge']), {0, 1})
+        self.assertEqual(set(el.id for el in self.g.incoming_edges(0)['edge']), {2})
+        self.assertEqual(set(el.id for el in self.g.outgoing_edges(0)['edge']), {0, 1})
 
         # test with list output
-        self.assertEqual(set(self.g.incoming_edges()[1]['edge']), {0, 1})
-        self.assertEqual(set(self.g.outgoing_edges()[1]['edge']), {2})
+        self.assertEqual(set(el.id for el in self.g.incoming_edges()[1]['edge']), {0, 1})
+        self.assertEqual(set(el.id for el in  self.g.outgoing_edges()[1]['edge']), {2})
 
         # test with id output
         self.assertEqual(self.g.senders(1).id, 0)

@@ -197,13 +197,13 @@ class DirectedGraph(object):
             for v_id in range(self.num_vertices(vertex_type)):
                 curr_v = {}
                 for k, v in self._edges.items():
-                    curr_v[k] = [el.id for el in v['info'] if el.receiver.id == v_id and el.receiver.type == vertex_type]
+                    curr_v[k] = [el for el in v['info'] if el.receiver.id == v_id and el.receiver.type == vertex_type]
                 incoming.append(curr_v)
         else:
             # dict of lists here
             incoming = {}
             for k, v in self._edges.items():
-                incoming[k] = [el.id for el in v['info'] if el.receiver.id == id and el.receiver.type == vertex_type]
+                incoming[k] = [el for el in v['info'] if el.receiver.id == id and el.receiver.type == vertex_type]
         return incoming
 
     def outgoing_edges(self, id=None, vertex_type=None):
@@ -214,12 +214,12 @@ class DirectedGraph(object):
             for v_id in range(self.num_vertices(vertex_type)):
                 curr_v = {}
                 for k, v in self._edges.items():
-                    curr_v[k] = [el.id for el in v['info'] if el.sender.id == v_id and el.sender.type == vertex_type]
+                    curr_v[k] = [el for el in v['info'] if el.sender.id == v_id and el.sender.type == vertex_type]
                 outgoing.append(curr_v)
         else:
             outgoing = {}
             for k, v in self._edges.items():
-                outgoing[k] = [el.id for el in v['info'] if el.sender.id == id and el.sender.type == vertex_type]
+                outgoing[k] = [el for el in v['info'] if el.sender.id == id and el.sender.type == vertex_type]
         return outgoing
 
     @property
@@ -242,11 +242,11 @@ class DirectedGraph(object):
             print("Vertices of type '%s'" % vt)
 
             for vid, vinfo in enumerate(self._vertices[vt]['info']):
-                print("Vertex with id: %d, data: %s, incoming edges: %s, outcoming edges: %s, type: %s." %
+                print("Vertex with id: %d, data: %s, incoming edges ids: %s, outcoming edges ids: %s, type: %s." %
                       (vid,
                        str(self._vertices[vt]['data'][vid]),
-                       self.incoming_edges(id=vid, vertex_type=vinfo.type),
-                       self.outgoing_edges(id=vid, vertex_type=vinfo.type),
+                       [el.id for el in self.incoming_edges(id=vid, vertex_type=vinfo.type)['edge']],
+                       [el.id for el in self.outgoing_edges(id=vid, vertex_type=vinfo.type)['edge']],
                        vinfo.type)
                       )
 
