@@ -38,12 +38,13 @@ def get_mlp_updaters(input_node_size, output_node_size, input_edge_size, output_
     return node_updater, edge_updater, global_updater
 
 
-class EncoderCoreDecoder(object):
+class EncoderCoreDecoder(nn.Module):
 
     def __init__(self, core_steps, enc_vertex_shape, core_vertex_shape, dec_vertex_shape, out_vertex_size,
                  enc_edge_shape, core_edge_shape, dec_edge_shape, out_edge_size,
                  enc_global_shape=(None, None), core_global_shape=(None, None), dec_global_shape=(None, None),
                  out_global_size=None):
+        super().__init__()
 
         self._core_steps = core_steps
         enc_node_updater, enc_edge_updater, enc_global_updater = get_mlp_updaters(*enc_vertex_shape,
@@ -76,13 +77,6 @@ class EncoderCoreDecoder(object):
             GlobalBlock({'context': nn.Sequential(dec_global_updater, nn.Linear(dec_global_shape[-1],
                                                                                 out_global_size))}) if dec_global_updater else None,
             )
-
-    def parameters(self, recurse=True):
-        params = []
-        for el in [self.encoder, self.core, self.decoder]:
-            for plist in el.parameters(recurse):
-                params.extend(list(plist))
-        return params
 
     def forward(self, input_g, output_all_steps=False):
         input_copy = input_g.get_copy()

@@ -14,6 +14,7 @@ import torch
 import torch.nn as nn
 from pgn.graph import DirectedGraphWithContext, Vertex, DirectedEdge, Context
 from pgn.models import EncoderCoreDecoder
+from pgn.utils import pgn2nx, plot_graph
 
 
 def graph_from_list(input_list):
@@ -100,6 +101,7 @@ if __name__ == '__main__':
     parser.add_argument('--eval-freq', type=int, default=100, help='Evaluation/logging frequency')
     parser.add_argument('--cuda', action="store_true", help='Use a GPU if the system has it.')
     parser.add_argument('--verbose', action="store_true", help='Print diagnostircs.')
+    parser.add_argument('--plot_graph_sample', action="store_true", help='Plot one of the input graphs')
     args = parser.parse_args()
 
     train_input_graphs, train_target_graphs = generate_graph_batch(args.num_train, sample_length=args.sample_length)
@@ -120,6 +122,12 @@ if __name__ == '__main__':
                                dec_global_shape=(16, 16),
                                out_global_size=2,
                                )
+
+    # plot one of the input graphs
+    if args.plot_graph_sample:
+        ng = pgn2nx(train_input_graphs[0])
+        plot_graph(ng, fname='input_graph.pdf')
+
     if args.cuda and torch.cuda.is_available():
         for el in train_input_graphs:
             el.to('cuda')
@@ -155,7 +163,9 @@ if __name__ == '__main__':
 
     unsorted = np.random.uniform(size=args.sample_length)
     test_g = graph_from_list(unsorted)
-    test_g.set_context_data(torch.Tensor([0]))
+    if args.cuda and torch.cuda.is_available():
+        test_g = test_g.to('cuda')
+
     g = model.forward(test_g, args.core_steps)[-1]
 
     # evaluate and plot

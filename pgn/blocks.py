@@ -8,22 +8,17 @@ class Block(nn.Module):
     def __init__(self, independent):
         super().__init__()
         self._independent = independent
+        self._params_registered = False
 
     @property
     def independent(self):
         return self._independent
 
-    def parameters(self, recurse=True):
-        params = []
-        for el in self._updaters.values():
-            params.append(el.parameters())
-        return params
-
 
 class NodeBlock(Block):
     def __init__(self, updaters=None, in_e2n_aggregators=None, out_e2n_aggregators=None):
         super().__init__(in_e2n_aggregators is None and out_e2n_aggregators is None)
-        self._updaters = updaters
+        self._updaters = nn.ModuleDict(updaters)
         self._in_e2n_aggregators = in_e2n_aggregators
         self._out_e2n_aggregators = out_e2n_aggregators
 
@@ -75,7 +70,7 @@ class NodeBlock(Block):
 class EdgeBlock(Block):
     def __init__(self, updaters=None, independent=False):
         super().__init__(independent)
-        self._updaters = updaters
+        self._updaters = nn.ModuleDict(updaters)
 
     def forward(self, G):
         out = {}
@@ -120,7 +115,7 @@ class GlobalBlock(Block):
 
         self._vertex_aggregators = vertex_aggregators
         self._edge_aggregators = edge_aggregators
-        self._updaters = updaters
+        self._updaters = nn.ModuleDict(updaters)
         # TODO Implement outgoing aggregators for the release
 
     def forward(self, G):
@@ -175,12 +170,6 @@ class GraphNetwork(nn.Module):
         if self._global_block is not None:
             G.set_context_data(self._global_block(G))
         return G
-
-    def parameters(self, recurse=True):
-        node_params = self._node_block.parameters() if self._node_block is not None else []
-        edge_params = self._edge_block.parameters() if self._edge_block is not None else []
-        context_params = self._global_block.parameters() if self._global_block is not None else []
-        return node_params + edge_params + context_params
 
     def to(self, device):
         if self._node_block is not None:
