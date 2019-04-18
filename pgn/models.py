@@ -2,7 +2,6 @@ import torch.nn as nn
 
 from pgn.aggregators import MeanAggregator
 from pgn.blocks import NodeBlock, EdgeBlock, GlobalBlock, GraphNetwork
-from pgn.graph import DirectedGraphWithContext
 
 
 def get_mlp(input_size, units, activation=nn.ReLU):
@@ -12,7 +11,7 @@ def get_mlp(input_size, units, activation=nn.ReLU):
         arch.append(nn.Linear(inpt_size, l))
         arch.append(activation())
         inpt_size = l
-    nn.LayerNorm(inpt_size)
+    arch.append(nn.LayerNorm(inpt_size))
     return nn.Sequential(*arch)
 
 
@@ -85,7 +84,6 @@ class EncoderCoreDecoder(nn.Module):
         output = []
         for s in range(self._core_steps):
             concatenated = latent0.__class__.concat([latent0, latent])
-
             latent = self.core(concatenated)
             if output_all_steps or s + 1 == self._core_steps:
                 output.append(self.decoder(latent))
