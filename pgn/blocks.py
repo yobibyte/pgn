@@ -128,8 +128,8 @@ class EdgeBlock(Block):
                 all_inpt = torch.cat([el[et] for el in updater_input_list])
                 # we need these to split after we get the output of a batch
                 input_idx = [el[et].shape[0] for el in updater_input_list]
-                all_inpt = self._updaters[et](all_inpt)
-                for out_idx, el in enumerate(all_inpt.split(input_idx)):
+                all_output = self._updaters[et](all_inpt)
+                for out_idx, el in enumerate(all_output.split(input_idx)):
                     out[out_idx][et] = el
         return out
 
@@ -151,23 +151,40 @@ class GlobalBlock(Block):
         self._updaters = nn.ModuleDict(updaters)
         # TODO Implement outgoing aggregators for the release
 
-    def forward(self, G):
-        out = {}
-        for t, cdata in G.context_data().items():
-            upd_input = [cdata]
-            if not self.independent:
-                for vtype, vdata in G.vertex_data().items():
-                    # Aggregate vertex attributes globally
-                    upd_input.append(self._vertex_aggregators[vtype]([vdata]).squeeze())
+    def forward(self, Gs):
+        if type(Gs) is not list:
+            Gs = [Gs]
 
-                for etype, edata in G.edge_data().items():
-                    # Aggregate edge attributes globally
-                    upd_input.append(self._edge_aggregators[etype]([edata]).squeeze())
-            upd_input = torch.cat(upd_input)
-            if t not in self._updaters:
-                out[t] = upd_input
+        updater_input_list = []
+        for g in Gs:
+            updater_input = {}
+
+            for t, cdata in g.context_data().items():
+                updater_input[t] = [cdata]
+                if not self.independent:
+                    for vtype, vdata in g.vertex_data().items():
+                        # Aggregate vertex attributes globally
+                        updater_input[t].append(self._vertex_aggregators[vtype]([vdata]))
+
+                    for etype, edata in g.edge_data().items():
+                        # Aggregate edge attributes globally
+                        updater_input[t].append(self._edge_aggregators[etype]([edata]))
+                updater_input[t] = torch.cat(updater_input[t], dim=1)
+            updater_input_list.append(updater_input)
+
+        out = [{} for _ in range(len(Gs))]
+        for ct in Gs[0].context_types:
+            if ct not in self._updaters:
+                for inpt_idx, inpt in enumerate(updater_input_list):
+                    out[inpt_idx][ct] = inpt[ct]
             else:
-                out[t] = self._updaters[t](upd_input)
+                # glue all the inputs for the same type
+                all_inpt = torch.cat([el[ct] for el in updater_input_list])
+                # we need these to split after we get the output of a batch
+                input_idx = [el[ct].shape[0] for el in updater_input_list]
+                all_outputs = self._updaters[ct](all_inpt)
+                for out_idx, el in enumerate(all_outputs.split(input_idx)):
+                    out[out_idx][ct] = el
         return out
     
     def to(self, device):
@@ -200,12 +217,13 @@ class GraphNetwork(nn.Module):
             for i, G in enumerate(Gs):
                 G.set_vertex_data(v_outs[i])
 
-        for G in Gs:
+        if self._global_block is not None:
             # 4. Aggregate edge attributes globally
             # 5. Aggregate node attributes globally
             # 6. Compute updated global attribute
-            if self._global_block is not None:
-                G.set_context_data(self._global_block(G))
+            g_outs = self._global_block(Gs)
+            for i, G in enumerate(Gs):
+                G.set_context_data(g_outs[i])
         return Gs
 
     def to(self, device):

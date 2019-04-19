@@ -37,9 +37,8 @@ def graph_from_list(input_list):
         {'data': torch.zeros(len(connectivity), 1),
          'info': [DirectedEdge(i, vertices[connectivity[i][0]], vertices[connectivity[i][1]]) for i in
                   range(len(connectivity))]},
-        {'data': torch.Tensor([0]), 'info': [Context(0)]}
+        {'data': torch.Tensor([[0]]), 'info': [Context(0)]}
     ]
-
     return DirectedGraphWithContext(entities)
 
 
@@ -106,7 +105,6 @@ if __name__ == '__main__':
 
     train_input_graphs, train_target_graphs = generate_graph_batch(args.num_train, sample_length=args.sample_length)
     eval_input_graphs, eval_target_graphs = generate_graph_batch(args.num_train, sample_length=args.sample_length)
-
 
     model = EncoderCoreDecoder(args.core_steps,
                                enc_vertex_shape=(1, 16),
