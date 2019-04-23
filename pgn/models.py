@@ -88,10 +88,7 @@ class EncoderCoreDecoder(nn.Module):
             if output_all_steps or s + 1 == self._core_steps:
                 outputs.append(self.decoder(latents))
 
-        if output_all_steps:
-            return outputs
-        else:
-            return [el[-1] for el in outputs]
+        return outputs
 
     def process_batch(self, input_graphs, compute_grad=True):
         if not compute_grad:
