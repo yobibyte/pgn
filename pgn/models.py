@@ -108,8 +108,3 @@ class EncoderCoreDecoder(nn.Module):
 
         return outs
     
-    def to(self, device):
-        self.encoder.to(device)
-        self.core.to(device)
-        self.decoder.to(device)
-

@@ -76,11 +76,6 @@ class NodeBlock(Block):
         return out
 
 
-    def to(self, device):
-        for el in self._updaters.values():
-            el.to(device)
-
-
 class EdgeBlock(Block):
     def __init__(self, updaters=None, independent=False):
         super().__init__(independent)
