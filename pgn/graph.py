@@ -358,21 +358,21 @@ class DirectedGraphWithContext(DirectedGraph):
             res._edges[t]['data'] = torch.cat([g._edges[t]['data'] for g in graph_list], dim=1)
 
         for t in res._context:
-            res._context[t]['data'] = torch.cat([g._context[t]['data'] for g in graph_list])
+            res._context[t]['data'] = torch.cat([g._context[t]['data'] for g in graph_list], dim=1)
 
         return res
 
     def context_data(self, type=None, concat=False):
         if type is None:
             if concat:
-                return torch.cat([v['data'] for k, v in self._context.items()])
+                # TODO this was never tested with several types of context variables
+                return torch.cat([v['data'] for v in self._context.values()]).squeeze()
             else:
                 return {k: v['data'] for k, v in self._context.items()}
         else:
             return self._context[type]['data']
 
     def set_context_data(self, data, type=None):
-
         if not isinstance(data, dict):
             if type is None:
                 type = self.default_context_type
@@ -389,6 +389,10 @@ class DirectedGraphWithContext(DirectedGraph):
                 'info': deepcopy(cdata['info'])
             })
         return entities
+
+    @property
+    def context_types(self):
+        return self._context.keys()
 
     @property
     def default_context_type(self):
