@@ -128,10 +128,6 @@ class EdgeBlock(Block):
                     out[out_idx][et] = el
         return out
 
-    def to(self, device):
-        for el in self._updaters.values():
-            el.to(device)
-
 
 class GlobalBlock(Block):
     def __init__(self, updaters=None, vertex_aggregators=None, edge_aggregators=None):
@@ -182,10 +178,6 @@ class GlobalBlock(Block):
                     out[out_idx][ct] = el
         return out
     
-    def to(self, device):
-        for el in self._updaters.values():
-            el.to(device)
-
 
 class GraphNetwork(nn.Module):
     def __init__(self, node_block=None, edge_block=None, global_block=None):
@@ -220,11 +212,3 @@ class GraphNetwork(nn.Module):
             for i, G in enumerate(Gs):
                 G.set_context_data(g_outs[i])
         return Gs
-
-    def to(self, device):
-        if self._node_block is not None:
-            self._node_block.to(device)
-        if self._edge_block is not None:
-            self._edge_block.to(device)
-        if self._global_block is not None:
-            self._global_block.to(device)
