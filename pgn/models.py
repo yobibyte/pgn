@@ -87,6 +87,9 @@ class EncoderCoreDecoder(nn.Module):
             latents = self.core(concatenated)
             if output_all_steps or s + 1 == self._core_steps:
                 outputs.append(self.decoder(latents))
+        
+        if not output_all_steps:
+            return [el[-1] for el in outputs]
 
         return outputs
 

@@ -162,9 +162,9 @@ if __name__ == '__main__':
     unsorted = np.random.uniform(size=args.sample_length)
     test_g = graph_from_list(unsorted)
     if args.cuda and torch.cuda.is_available():
-        test_g = test_g.to('cuda')
+        test_g.to('cuda')
 
-    g = model.forward(test_g, args.core_steps)[-1]
+    g = model.forward([test_g])[0]
 
     # evaluate and plot
     mx = np.zeros((len(unsorted), len(unsorted)))
