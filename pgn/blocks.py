@@ -198,7 +198,7 @@ class GraphNetwork(nn.Module):
         # 3. Compute updated node attributes
         if self._node_block is not None:
             v_outs = self._node_block(Gs)
-            for i, G in enumerate(G):
+            for i, G in enumerate(Gs):
                 G.set_vertex_data(v_outs[i])
 
         if self._global_block is not None:
