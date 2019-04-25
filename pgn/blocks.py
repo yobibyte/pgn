@@ -190,9 +190,10 @@ class GraphNetwork(nn.Module):
         # make one pass as in the original paper
         # 1. Compute updated edge attributes
         if self._edge_block is not None:
-            edge_outs = self._edge_block(Gs)
-            for i, G in enumerate(Gs):
-                G.set_edge_data(edge_outs[i])
+            for G in Gs:
+                edge_outs = self._edge_block(G)
+                #for i, G in enumerate(Gs):
+                G.set_edge_data(edge_outs[0])
 
         # 2. Aggregate edge attributes per node
         # 3. Compute updated node attributes
