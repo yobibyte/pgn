@@ -59,7 +59,7 @@ class DirectedGraph(object):
         self._edges = {el['info'][0].type: el for el in entities if isinstance(el['info'][0], DirectedEdge)}
 
         for t, v in self._vertices.items():
-            if not isinstance(v['data'], torch.Tensor):
+            if v['data'] is not None and not isinstance(v['data'], torch.Tensor):
                 v['data'] = torch.Tensor(v['data'])
 
             for vid, el in enumerate(v['info']):
@@ -73,7 +73,7 @@ class DirectedGraph(object):
                                  "from the number of edges in the 'info' list" % t)
 
         for t, v in self._edges.items():
-            if not isinstance(v['data'], torch.Tensor):
+            if v['data'] is not None and not isinstance(v['data'], torch.Tensor):
                 v['data'] = torch.Tensor(v['data'])
 
             for eid, el in enumerate(v['info']):
@@ -286,7 +286,7 @@ class DirectedGraph(object):
         return self.__class__(self.get_entities(zero_data=True))
 
     @classmethod
-    def concat(cls, graph_list):
+    def concat(cls, graph_list, topology=None):
         """
         Concatenate features of the directed graphs with the same topology
         Parameters
@@ -308,7 +308,10 @@ class DirectedGraph(object):
 
         # TODO check that topology is the same for everyone
         # TODO it's wasteful to copy zeros every type, just get the stub for the data with Nones
-        res = graph_list[0].get_graph_with_same_topology()
+        if topology is None:
+            res = graph_list[0].get_graph_with_same_topology()
+        else:
+            res = topology
 
         for t in res.vertex_types:
             res._vertices[t]['data'] = torch.cat([g._vertices[t]['data'] for g in graph_list], dim=1)
@@ -325,6 +328,10 @@ class DirectedGraph(object):
         for e in self._edges.values():
             e['data'] = e['data'].to(device)
 
+    def set_data(self, vertex_data=None, edge_data=None):
+        self.set_vertex_data(vertex_data)
+        self.set_edge_data(edge_data)
+
 class DirectedGraphWithContext(DirectedGraph):
     def __init__(self, entities):
         super().__init__(entities)
@@ -335,7 +342,7 @@ class DirectedGraphWithContext(DirectedGraph):
         return self._context
 
     @classmethod
-    def concat(cls, graph_list):
+    def concat(cls, graph_list, topology=None):
         # TODO reuse the code from the parent class as much as possible
         # this is just a temporary (huh) copypaste from the parent class
 
@@ -349,7 +356,10 @@ class DirectedGraphWithContext(DirectedGraph):
 
         # TODO check that topology is the same for everyone
         # TODO it's wasteful to copy zeros every type, just get the stub for the data with Nones
-        res = graph_list[0].get_graph_with_same_topology()
+        if topology is None:
+            res = graph_list[0].get_graph_with_same_topology()
+        else:
+            res = topology
 
         for t in res.vertex_types:
             res._vertices[t]['data'] = torch.cat([g._vertices[t]['data'] for g in graph_list], dim=1)
@@ -385,7 +395,7 @@ class DirectedGraphWithContext(DirectedGraph):
         entities = super().get_entities(zero_data)
         for cdata in self._context.values():
             entities.append({
-                'data': cdata['data'].clone(),
+                'data': cdata['data'].clone() if not zero_data else None,
                 'info': deepcopy(cdata['info'])
             })
         return entities
@@ -405,3 +415,7 @@ class DirectedGraphWithContext(DirectedGraph):
 
         for c in self._context.values():
             c['data'] = c['data'].to(device)
+
+    def set_data(self, vertex_data=None, edge_data=None, context_data=None):
+        super().set_data(vertex_data, edge_data)
+        self.set_context_data(context_data)

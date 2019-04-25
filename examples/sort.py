@@ -74,11 +74,12 @@ def create_target_graph(input_graph):
 
 def generate_graph_batch(n_examples, sample_length, target=True):
     input_graphs = [graph_from_list(np.random.uniform(size=sample_length)) for _ in range(n_examples)]
-    target_graphs = [create_target_graph(g) for g in input_graphs] if target else None
-    if target_graphs is not None:
-        return input_graphs, target_graphs
-    else:
+    if not target:
         return input_graphs
+
+    target_graphs = [create_target_graph(g) for g in input_graphs]
+    return input_graphs, target_graphs
+
 
 def batch_loss(outs, targets, criterion):
         node_loss = 0
@@ -105,6 +106,11 @@ if __name__ == '__main__':
 
     train_input_graphs, train_target_graphs = generate_graph_batch(args.num_train, sample_length=args.sample_length)
     eval_input_graphs, eval_target_graphs = generate_graph_batch(args.num_train, sample_length=args.sample_length)
+
+    train_in_data = [(g.vertex_data(), g.edge_data(), g.context_data()) for g in train_input_graphs]
+    train_target_data = [(g.vertex_data(), g.edge_data(), g.context_data()) for g in train_target_graphs]
+    eval_in_data = [(g.vertex_data(), g.edge_data(), g.context_data()) for g in eval_input_graphs]
+    eval_target_data = [(g.vertex_data(), g.edge_data(), g.context_data()) for g in eval_target_graphs]
 
     model = EncoderCoreDecoder(args.core_steps,
                                enc_vertex_shape=(1, 16),
@@ -143,6 +149,14 @@ if __name__ == '__main__':
     for e in range(args.epochs):
         st_time = time.time()
 
+        for i in range(len(train_input_graphs)):
+            train_input_graphs[i].set_vertex_data(train_in_data[i][0])
+            train_input_graphs[i].set_edge_data(train_in_data[i][1])
+            train_input_graphs[i].set_context_data(train_in_data[i][2])
+            train_target_graphs[i].set_vertex_data(train_target_data[i][0])
+            train_target_graphs[i].set_edge_data(train_target_data[i][1])
+            train_target_graphs[i].set_context_data(train_target_data[i][2])
+
         optimiser.zero_grad()
         train_outs = model.process_batch(train_input_graphs)
         train_loss = batch_loss(train_outs, train_target_graphs, criterion)
@@ -154,6 +168,12 @@ if __name__ == '__main__':
         if args.verbose:
             print('Epoch {} is done. {:.2f} sec spent.'.format(e, end_time - st_time))
         if e % args.eval_freq == 0 or e == args.epochs - 1:
+            for i in range(len(train_input_graphs)):
+                eval_input_graphs[i].set_data(*eval_in_data[i])
+                eval_target_graphs[i].set_data(*eval_target_data[i])
+
+
+
             eval_outs = model.process_batch(eval_input_graphs, compute_grad=False)
             eval_loss = batch_loss(eval_outs, eval_target_graphs, criterion)
             print("Epoch %d, mean training loss: %f, mean evaluation loss: %f."

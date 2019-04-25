@@ -186,11 +186,8 @@ class GraphNetwork(nn.Module):
         self._edge_block = edge_block
         self._global_block = global_block
 
-    def forward(self, Gs, modify_input=False):
-        if not modify_input:
-            Gs = [G.get_copy() for G in Gs]
+    def forward(self, Gs):
         # make one pass as in the original paper
-
         # 1. Compute updated edge attributes
         if self._edge_block is not None:
             edge_outs = self._edge_block(Gs)

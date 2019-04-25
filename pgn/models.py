@@ -78,13 +78,29 @@ class EncoderCoreDecoder(nn.Module):
             )
 
     def forward(self, input_graphs, output_all_steps=False):
-        input_copies = [el.get_copy() for el in input_graphs]
-        latents = self.encoder(input_copies)
+        latents = self.encoder(input_graphs)
+        latents_data = [(el.vertex_data(), el.edge_data(), el.context_data()) for el in latents]
+
+        # this data won't change during the computation
         latents0 = [el.get_copy() for el in latents]
+        latents0_data = [(el.vertex_data(), el.edge_data(), el.context_data()) for el in latents0]
+
+        concat_topo = [latents0[i].__class__.concat([latents0[i], latents[i]]) for i in range(len(input_graphs))]
+
         outputs = []
+
         for s in range(self._core_steps):
-            concatenated = [latents0[i].__class__.concat([latents0[i], latents[i]]) for i in range(len(input_graphs))]
+            for lidx, g in enumerate(latents0):
+                g.set_data(*latents0_data[lidx])
+
+            for lidx, g in enumerate(latents):
+                g.set_data(*latents_data[lidx])
+
+            concatenated = [l0.__class__.concat([l0, l], ct) for l0, l, ct in zip(latents0, latents, concat_topo)]
+
             latents = self.core(concatenated)
+            latents_data = [(el.vertex_data(), el.edge_data(), el.context_data()) for el in latents]
+
             if output_all_steps or s + 1 == self._core_steps:
                 outputs.append(self.decoder(latents))
         
