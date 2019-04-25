@@ -190,25 +190,22 @@ class GraphNetwork(nn.Module):
         # make one pass as in the original paper
         # 1. Compute updated edge attributes
         if self._edge_block is not None:
-            for G in Gs:
-                edge_outs = self._edge_block(G)
-                #for i, G in enumerate(Gs):
-                G.set_edge_data(edge_outs[0])
+            edge_outs = self._edge_block(Gs)
+            for i, G in enumerate(Gs):
+                G.set_edge_data(edge_outs[i])
 
         # 2. Aggregate edge attributes per node
         # 3. Compute updated node attributes
         if self._node_block is not None:
-            for G in Gs:
-                v_outs = self._node_block(G)
-                #for i, G in enumerate(G):
-                G.set_vertex_data(v_outs[0])
+            v_outs = self._node_block(Gs)
+            for i, G in enumerate(G):
+                G.set_vertex_data(v_outs[i])
 
         if self._global_block is not None:
             # 4. Aggregate edge attributes globally
             # 5. Aggregate node attributes globally
             # 6. Compute updated global attribute
-            for G in Gs:
-                g_outs = self._global_block(G)
-            #for i, G in enumerate(Gs):
-                G.set_context_data(g_outs[0])
+            g_outs = self._global_block(Gs)
+            for i, G in enumerate(Gs):
+                G.set_context_data(g_outs[i])
         return Gs

@@ -82,13 +82,11 @@ def generate_graph_batch(n_examples, sample_length, target=True):
 
 
 def batch_loss(outs, targets, criterion):
-        cum_loss = 0
-        for out, target_g in zip(outs, targets):
-            loss = 0
-            loss += sum([criterion(g.vertex_data('vertex'), target_g.vertex_data('vertex')) for g in out])
-            loss += sum([criterion(g.edge_data('edge'), target_g.edge_data('edge')) for g in out])
-            cum_loss += loss
-        return cum_loss
+        loss = 0
+        for out in outs:
+            loss += sum([criterion(g.vertex_data('vertex'), t.vertex_data('vertex')) for g, t in zip(out, targets)])
+            loss += sum([criterion(g.edge_data('edge'), t.edge_data('edge')) for g, t in zip(out, targets)])
+        return loss
 
 
 if __name__ == '__main__':
