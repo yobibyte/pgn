@@ -105,7 +105,7 @@ class EncoderCoreDecoder(nn.Module):
                 outputs.append(self.decoder(latents))
         
         if not output_all_steps:
-            return [el[-1] for el in outputs]
+            return outputs[-1]
 
         return outputs
 
