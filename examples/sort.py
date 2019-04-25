@@ -82,11 +82,14 @@ def generate_graph_batch(n_examples, sample_length, target=True):
 
 
 def batch_loss(outs, targets, criterion):
-        loss = 0
+        cum_loss = 0
         for out, target_g in zip(outs, targets):
+            loss = 0
             loss += sum([criterion(g.vertex_data('vertex'), target_g.vertex_data('vertex')) for g in out])
             loss += sum([criterion(g.edge_data('edge'), target_g.edge_data('edge')) for g in out])
-        return loss
+            cum_loss += loss
+        return cum_loss
+
 
 if __name__ == '__main__':
 
@@ -155,9 +158,10 @@ if __name__ == '__main__':
             train_target_graphs[i].set_edge_data(train_target_data[i][1])
             train_target_graphs[i].set_context_data(train_target_data[i][2])
 
-        optimiser.zero_grad()
+
         train_outs = model.process_batch(train_input_graphs)
         train_loss = batch_loss(train_outs, train_target_graphs, criterion)
+        optimiser.zero_grad()
         train_loss.backward()
 
         optimiser.step()
