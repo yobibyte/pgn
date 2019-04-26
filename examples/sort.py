@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-from pgn.graph import Vertex, DirectedEdge, Context
+from pgn.graph import Vertex, DirectedEdge, Context, DirectedGraphWithContext
 from pgn.models import EncoderCoreDecoder
 from pgn.utils import pgn2nx, plot_graph
 
@@ -170,11 +170,17 @@ if __name__ == '__main__':
 
     unsorted = np.random.uniform(size=args.sample_length)
     test_g = graph_data_from_list(unsorted)
+    test_g['vertex'] = {'vertex': test_g['vertex']}
+    test_g['edge'] = {'edge': test_g['edge']}
+    test_g['context'] = {'context': test_g['context']}
+
+
 
     if args.cuda and torch.cuda.is_available():
         test_g.to('cuda')
 
     g = model.forward([test_g])[0]
+    g = DirectedGraphWithContext(g)
 
     # evaluate and plot
     mx = np.zeros((len(unsorted), len(unsorted)))
