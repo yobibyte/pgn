@@ -3,7 +3,6 @@ import pgn.graph as pg
 import torch
 import torch.nn as nn
 
-
 class Block(nn.Module):
     def __init__(self, independent):
         super().__init__()
@@ -23,7 +22,7 @@ class NodeBlock(Block):
         self._out_e2n_aggregators = out_e2n_aggregators
 
     def forward(self, Gs):
-        if type(Gs) is not list:
+        if isinstance(Gs, pg.Graph):
             Gs = [Gs]
 
         updater_input_list = []
@@ -85,7 +84,7 @@ class EdgeBlock(Block):
         # I assume that graphs are homogenious here, i.e. they have the same types of entities,
         # but that makes sense since the model depends on the graph entities types
 
-        if type(Gs) is not list:
+        if isinstance(Gs, pg.Graph):
             Gs = [Gs]
 
         updater_input_list = []
@@ -143,7 +142,7 @@ class GlobalBlock(Block):
         # TODO Implement outgoing aggregators for the release
 
     def forward(self, Gs):
-        if type(Gs) is not list:
+        if isinstance(Gs, pg.Graph):
             Gs = [Gs]
 
         updater_input_list = []

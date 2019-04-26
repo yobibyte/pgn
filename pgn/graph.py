@@ -46,8 +46,10 @@ class Context(Entity):
     def __init__(self, id, type='context', hidden_info=None):
         super().__init__(id, type, hidden_info=hidden_info)
 
+class Graph(object):
+    pass
 
-class DirectedGraph(object):
+class DirectedGraph(Graph):
     def __init__(self, entities):
 
         # entities is a dict, where the key stands for the entity type,
