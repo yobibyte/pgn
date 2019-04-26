@@ -22,6 +22,7 @@ def generate_graph():
 
 
 def pgn2nx(ig):
+    ig = DirectedGraph(ig)
     G = nx.MultiDiGraph()
     for t, vinfo in ig.vertex_info().items():
         for v in vinfo:

@@ -2,7 +2,7 @@ import torch.nn as nn
 
 from pgn.aggregators import MeanAggregator
 from pgn.blocks import NodeBlock, EdgeBlock, GlobalBlock, GraphNetwork
-
+import pgn.graph as pg
 
 def get_mlp(input_size, units, activation=nn.ReLU):
     arch = []
@@ -42,8 +42,10 @@ class EncoderCoreDecoder(nn.Module):
     def __init__(self, core_steps, enc_vertex_shape, core_vertex_shape, dec_vertex_shape, out_vertex_size,
                  enc_edge_shape, core_edge_shape, dec_edge_shape, out_edge_size,
                  enc_global_shape=(None, None), core_global_shape=(None, None), dec_global_shape=(None, None),
-                 out_global_size=None):
+                 out_global_size=None,
+                 input_type=pg.DirectedGraphWithContext):
         super().__init__()
+        self._input_type = input_type
 
         self._core_steps = core_steps
         enc_node_updater, enc_edge_updater, enc_global_updater = get_mlp_updaters(*enc_vertex_shape,
@@ -77,36 +79,30 @@ class EncoderCoreDecoder(nn.Module):
                                                                                 out_global_size))}) if dec_global_updater else None,
             )
 
-    def forward(self, input_graphs, output_all_steps=False):
-        latents = self.encoder(input_graphs)
-        latents_data = [(el.vertex_data(), el.edge_data(), el.context_data()) for el in latents]
+    def forward(self, input_data, output_all_steps=False):
 
-        # this data won't change during the computation
-        latents0 = [el.get_copy() for el in latents]
-        latents0_data = [(el.vertex_data(), el.edge_data(), el.context_data()) for el in latents0]
+        # this data won't change during the core computation
+        latents0_data = self.encoder([self._input_type(d) for d in input_data])
 
-        concat_topo = [latents0[i].__class__.concat([latents0[i], latents[i]]) for i in range(len(input_graphs))]
-
+        latents_data = [el for el in latents0_data]
         outputs = []
+        concat_topo = None
 
         for s in range(self._core_steps):
-            for lidx, g in enumerate(latents0):
-                g.set_data(*latents0_data[lidx])
+            latents0 = [self._input_type(d) for d in latents0_data]
+            latents = [self._input_type(d) for d in latents_data]
 
-            for lidx, g in enumerate(latents):
-                g.set_data(*latents_data[lidx])
+            if concat_topo is None:
+                concat_topo = [lg.get_graph_with_same_topology() for lg in latents0]
 
             concatenated = [l0.__class__.concat([l0, l], ct) for l0, l, ct in zip(latents0, latents, concat_topo)]
-
-            latents = self.core(concatenated)
-            latents_data = [(el.vertex_data(), el.edge_data(), el.context_data()) for el in latents]
+            latents_data = self.core(concatenated)
 
             if output_all_steps or s + 1 == self._core_steps:
                 outputs.append(self.decoder(latents))
-        
+
         if not output_all_steps:
             return outputs[-1]
-
         return outputs
 
     def process_batch(self, input_graphs, compute_grad=True):

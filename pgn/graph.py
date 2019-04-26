@@ -57,8 +57,8 @@ class DirectedGraph(Graph):
         # in the array corresponds to the index in the fist dimension of the data tensor
         # [{'data': tf.Tensor, 'info': []}, ]
 
-        self._vertices = {el['info'][0].type: el for el in entities if isinstance(el['info'][0], Vertex)}
-        self._edges = {el['info'][0].type: el for el in entities if isinstance(el['info'][0], DirectedEdge)}
+        self._vertices = {k:v.copy() for k,v in entities['vertex'].items()}
+        self._edges = {k:v.copy() for k,v in entities['edge'].items()}
 
         for t, v in self._vertices.items():
             if v['data'] is not None and not isinstance(v['data'], torch.Tensor):
@@ -264,22 +264,28 @@ class DirectedGraph(Graph):
                       )
 
     def get_entities(self, zero_data=False):
-        entities = []
+        entities = {'vertex': {}, 'edge': {}}
+
         for vtype, vdata in self._vertices.items():
-            vdict = {'info': deepcopy(vdata['info'])}
+            vdict = {'info': vdata['info']}
             if zero_data:
                 vdict['data'] = torch.zeros_like(vdata['data'])
             else:
                 vdict['data'] = vdata['data'].clone()
-            entities.append(vdict)
+            entities['vertex'][vtype] = vdict
+
         for etype, edata in self._edges.items():
-            edict = {'info': deepcopy(edata['info'])}
+            edict = {'info': edata['info']}
             if zero_data:
                 edict['data'] = torch.zeros_like(edata['data'])
             else:
                 edict['data'] = edata['data'].clone()
-            entities.append(edict)
+            entities['edge'][etype] = edict
         return entities
+
+    def get_deep_coopy(self):
+        # TODO
+        return NotImplementedError
 
     def get_copy(self):
         return self.__class__(self.get_entities(zero_data=False))
@@ -340,7 +346,7 @@ class DirectedGraph(Graph):
 class DirectedGraphWithContext(DirectedGraph):
     def __init__(self, entities):
         super().__init__(entities)
-        self._context = {el['info'][0].type: el for el in entities if isinstance(el['info'][0], Context)}
+        self._context = {k:v.copy() for k,v in entities['context'].items()}
 
     @property
     def context(self):
@@ -398,11 +404,12 @@ class DirectedGraphWithContext(DirectedGraph):
 
     def get_entities(self, zero_data=False):
         entities = super().get_entities(zero_data)
-        for cdata in self._context.values():
-            entities.append({
-                'data': cdata['data'].clone() if not zero_data else None,
-                'info': deepcopy(cdata['info'])
-            })
+        entities['context'] = {}
+        for ctype, cdata in self._context.items():
+            entities['context'][ctype] = {
+                                'data': cdata['data'].clone() if not zero_data else None,
+                                'info': cdata['info']
+                               }
         return entities
 
     @property

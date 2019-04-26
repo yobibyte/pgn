@@ -12,12 +12,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-from pgn.graph import DirectedGraphWithContext, Vertex, DirectedEdge, Context
+from pgn.graph import Vertex, DirectedEdge, Context
 from pgn.models import EncoderCoreDecoder
 from pgn.utils import pgn2nx, plot_graph
 
 
-def graph_from_list(input_list):
+def graph_data_from_list(input_list):
     """
     Takes a list with the data, generates a fully connected graph with values of the list as nodes
     Parameters
@@ -31,61 +31,63 @@ def graph_from_list(input_list):
     """
     connectivity = [el for el in itertools.product(range(len(input_list)), repeat=2)]
     vertices = [Vertex(i) for i in range(len(input_list))]
-    entities = [
-        {'data': torch.Tensor([[v] for v in input_list]),
-         'info': vertices},
-        {'data': torch.zeros(len(connectivity), 1),
-         'info': [DirectedEdge(i, vertices[connectivity[i][0]], vertices[connectivity[i][1]]) for i in
-                  range(len(connectivity))]},
-        {'data': torch.Tensor([[0]]), 'info': [Context(0)]}
-    ]
-    return DirectedGraphWithContext(entities)
 
+    graph_data = {'vertex': {'data': torch.Tensor([[v] for v in input_list]), 'info': vertices},
+                  'edge': {'data': torch.zeros(len(connectivity), 1),
+                           'info': [DirectedEdge(i, vertices[connectivity[i][0]], vertices[connectivity[i][1]]) for i in
+                                range(len(connectivity))]},
+                  'context': {'data': torch.Tensor([[0]]), 'info': [Context(0)]}
+                  }
+    return graph_data
 
-def create_target_graph(input_graph):
+def edge_id_by_sender_and_receiver(metadata, sid, rid):
+
+    if sid > len(metadata) - 1 or rid > len(metadata) - 1:
+        return -1
+
+    for e in metadata:
+        if e.sender.id == sid and e.receiver.id == rid:
+            return e.id
+
+    return -1
+
+def create_target_data(input_data):
     # two nodes might have true since they might have similar values
-
-    target_graph = input_graph.get_graph_with_same_topology()
-
-    vertex_data = [v.item() for v in input_graph.vertex_data('vertex')]
-    values = [(nid, ndata) for nid, ndata in enumerate(vertex_data)]
-    min_value = min([v[1] for v in values])
+    min_value = input_data['vertex']['data'].min()
 
     # [prob_true, prob_false]
-    target_graph.set_vertex_data(torch.Tensor([[1.0, 0.0] if v == min_value else [0.0, 1.0] for v in vertex_data]))
+    target_vertex_data = \
+        torch.Tensor([[1.0, 0.0] if v == min_value else [0.0, 1.0] for v in input_data['vertex']['data']])
 
-    sorted_values = sorted(values, key=lambda x: x[1])
-    sorted_ids = [v[0] for v in sorted_values]
-
-    data = torch.zeros(input_graph.num_edges('edge'), 2)
+    sorted_ids = input_data['vertex']['data'].argsort()
+    target_edge_data = torch.zeros(input_data['edge']['data'].shape[0], 2)
     for sidx, sid in enumerate(sorted_ids):
         for ridx, rid in enumerate(sorted_ids):
-            eid = input_graph.identify_edge_by_sender_and_receiver(sid, rid).id
+            eid = edge_id_by_sender_and_receiver(input_data['edge']['info'], sid, rid)
             # we look for exact comparison here since we sort
             if (sidx < len(sorted_ids) - 1 and ridx == sidx + 1):
-                data[eid][0] = 1.0
+                target_edge_data[eid][0] = 1.0
             else:
-                data[eid][1] = 1.0
+                target_edge_data[eid][1] = 1.0
 
-    target_graph.set_edge_data(data)
-
-    return target_graph
+    return {'vertex': target_vertex_data,
+            'edge': target_edge_data}
 
 
 def generate_graph_batch(n_examples, sample_length, target=True):
-    input_graphs = [graph_from_list(np.random.uniform(size=sample_length)) for _ in range(n_examples)]
+    input_data = [graph_data_from_list(np.random.uniform(size=sample_length)) for _ in range(n_examples)]
     if not target:
-        return input_graphs
+        return input_data
 
-    target_graphs = [create_target_graph(g) for g in input_graphs]
-    return input_graphs, target_graphs
+    target_data = [create_target_data(g) for g in input_data]
+    return input_data, target_data
 
 
 def batch_loss(outs, targets, criterion):
         loss = 0
         for out in outs:
-            loss += sum([criterion(g.vertex_data('vertex'), t.vertex_data('vertex')) for g, t in zip(out, targets)])
-            loss += sum([criterion(g.edge_data('edge'), t.edge_data('edge')) for g, t in zip(out, targets)])
+            loss += sum([criterion(g['vertex']['vertex']['data'], t['vertex']) for g, t in zip(out, targets)])
+            loss += sum([criterion(g['edge']['edge']['data'], t['edge']) for g, t in zip(out, targets)])
         return loss
 
 
@@ -103,13 +105,8 @@ if __name__ == '__main__':
     parser.add_argument('--plot_graph_sample', action="store_true", help='Plot one of the input graphs')
     args = parser.parse_args()
 
-    train_input_graphs, train_target_graphs = generate_graph_batch(args.num_train, sample_length=args.sample_length)
-    eval_input_graphs, eval_target_graphs = generate_graph_batch(args.num_train, sample_length=args.sample_length)
-
-    train_in_data = [(g.vertex_data(), g.edge_data(), g.context_data()) for g in train_input_graphs]
-    train_target_data = [(g.vertex_data(), g.edge_data(), g.context_data()) for g in train_target_graphs]
-    eval_in_data = [(g.vertex_data(), g.edge_data(), g.context_data()) for g in eval_input_graphs]
-    eval_target_data = [(g.vertex_data(), g.edge_data(), g.context_data()) for g in eval_target_graphs]
+    train_input, train_target = generate_graph_batch(args.num_train, sample_length=args.sample_length)
+    eval_input, eval_target = generate_graph_batch(args.num_train, sample_length=args.sample_length)
 
     model = EncoderCoreDecoder(args.core_steps,
                                enc_vertex_shape=(1, 16),
@@ -128,19 +125,26 @@ if __name__ == '__main__':
 
     # plot one of the input graphs
     if args.plot_graph_sample:
-        ng = pgn2nx(train_input_graphs[0])
+        ng = pgn2nx(train_input[0])
         plot_graph(ng, fname='input_graph.pdf')
 
     if args.cuda and torch.cuda.is_available():
-        for el in train_input_graphs:
-            el.to('cuda')
-        for el in train_target_graphs:
-            el.to('cuda')
-        for el in eval_input_graphs:
-            el.to('cuda')
-        for el in eval_target_graphs:
-            el.to('cuda')
+        for el in train_input + train_target + eval_input + eval_target:
+            for d in el.values():
+                d['data'].to('cuda')
         model.to('cuda')
+
+    # the library expects the data to be in the form of
+    # {'entity': {'etype1': {'data': [], 'info'}}}
+    # the first level is the entity (e.g. vertex or edge)
+    # the second level is the entity type
+    # the last level is data and info
+    for el in train_input + eval_input:
+        el['vertex'] = {'vertex': el['vertex']}
+        el['edge'] = {'edge': el['edge']}
+        if 'context' in el:
+            el['context'] = {'context': el['context']}
+
 
     optimiser = torch.optim.Adam(lr=0.001, params=model.parameters())
     criterion = nn.BCEWithLogitsLoss()
@@ -148,39 +152,25 @@ if __name__ == '__main__':
     for e in range(args.epochs):
         st_time = time.time()
 
-        for i in range(len(train_input_graphs)):
-            train_input_graphs[i].set_vertex_data(train_in_data[i][0])
-            train_input_graphs[i].set_edge_data(train_in_data[i][1])
-            train_input_graphs[i].set_context_data(train_in_data[i][2])
-            train_target_graphs[i].set_vertex_data(train_target_data[i][0])
-            train_target_graphs[i].set_edge_data(train_target_data[i][1])
-            train_target_graphs[i].set_context_data(train_target_data[i][2])
 
-
-        train_outs = model.process_batch(train_input_graphs)
-        train_loss = batch_loss(train_outs, train_target_graphs, criterion)
+        train_outs = model.process_batch(train_input)
+        train_loss = batch_loss(train_outs, train_target, criterion)
         optimiser.zero_grad()
         train_loss.backward()
-
         optimiser.step()
 
         end_time = time.time()
         if args.verbose:
             print('Epoch {} is done. {:.2f} sec spent.'.format(e, end_time - st_time))
         if e % args.eval_freq == 0 or e == args.epochs - 1:
-            for i in range(len(train_input_graphs)):
-                eval_input_graphs[i].set_data(*eval_in_data[i])
-                eval_target_graphs[i].set_data(*eval_target_data[i])
-
-
-
-            eval_outs = model.process_batch(eval_input_graphs, compute_grad=False)
-            eval_loss = batch_loss(eval_outs, eval_target_graphs, criterion)
+            eval_outs = model.process_batch(eval_input, compute_grad=False)
+            eval_loss = batch_loss(eval_outs, eval_target, criterion)
             print("Epoch %d, mean training loss: %f, mean evaluation loss: %f."
                   % (e, train_loss.item() / args.num_train, eval_loss.item() / args.num_train))
 
     unsorted = np.random.uniform(size=args.sample_length)
-    test_g = graph_from_list(unsorted)
+    test_g = graph_data_from_list(unsorted)
+
     if args.cuda and torch.cuda.is_available():
         test_g.to('cuda')
 

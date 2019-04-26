@@ -207,4 +207,4 @@ class GraphNetwork(nn.Module):
             g_outs = self._global_block(Gs)
             for i, G in enumerate(Gs):
                 G.set_context_data(g_outs[i])
-        return Gs
+        return [G.get_entities() for G in Gs]
