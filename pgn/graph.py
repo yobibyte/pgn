@@ -334,6 +334,9 @@ class DirectedGraph(Graph):
         self.set_vertex_data(vertex_data)
         self.set_edge_data(edge_data)
 
+    def get_data(self):
+        return self.vertex_data(), self.edge_data()
+
 class DirectedGraphWithContext(DirectedGraph):
     def __init__(self, entities):
         super().__init__(entities)
@@ -421,3 +424,7 @@ class DirectedGraphWithContext(DirectedGraph):
     def set_data(self, vertex_data=None, edge_data=None, context_data=None):
         super().set_data(vertex_data, edge_data)
         self.set_context_data(context_data)
+
+    def get_data(self):
+        vdata, edata = super().get_data()
+        return vdata, edata, self.context_data()
