@@ -92,8 +92,8 @@ def batch_loss(outs, targets, criterion):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Sorting with graph networks')
-    parser.add_argument('--num-train', type=int, default=10, help='number of training examples')
-    parser.add_argument('--num-eval', type=int, default=10, help='number of evaluation examples')
+    parser.add_argument('--num-train', type=int, default=32, help='number of training examples')
+    parser.add_argument('--num-eval', type=int, default=32, help='number of evaluation examples')
     parser.add_argument('--epochs', type=int, default=5000, help='number of training epochs')
     parser.add_argument('--core-steps', type=int, default=10, help='number of core processing steps')
     parser.add_argument('--sample-length', type=int, default=10, help='number of elements in the list to sort')
