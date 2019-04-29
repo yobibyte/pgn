@@ -40,7 +40,24 @@ class DirectedEdge(Entity):
 class Vertex(Entity):
     def __init__(self, id, type='vertex', hidden_info=None):
         super().__init__(id, type, hidden_info=hidden_info)
+        self._incoming_edges = None
+        self._outgoing_edges = None
 
+    @property
+    def incoming_edges(self):
+        return self._incoming_edges
+
+    @incoming_edges.setter
+    def incoming_edges(self, incoming_edges):
+        self._incoming_edges = incoming_edges
+
+    @property
+    def outgoing_edges(self):
+        return self._outgoing_edges
+
+    @outgoing_edges.setter
+    def outgoing_edges(self, outgoing_edges):
+        self._outgoing_edges = outgoing_edges
 
 class Context(Entity):
     def __init__(self, id, type='context', hidden_info=None):
@@ -56,9 +73,8 @@ class DirectedGraph(Graph):
         # and the value is the dict with the 'data' and 'info' which has a list of all the entities where their index
         # in the array corresponds to the index in the fist dimension of the data tensor
         # [{'data': tf.Tensor, 'info': []}, ]
-
-        self._vertices = {k:v.copy() for k,v in entities['vertex'].items()}
-        self._edges = {k:v.copy() for k,v in entities['edge'].items()}
+        self._vertices = {k: v.copy() for k,v in entities['vertex'].items()}
+        self._edges = {k: v.copy() for k,v in entities['edge'].items()}
 
         for t, v in self._vertices.items():
             if v['data'] is not None and not isinstance(v['data'], torch.Tensor):
@@ -99,6 +115,16 @@ class DirectedGraph(Graph):
                     raise ValueError(
                         "Receiver %d for edge %d of type %s is invalid. It's either its id is negative or bigger "
                         "then number of your nodes. " % (e.receiver.id, e.id, e.type))
+
+        for t, vdata in self._vertices.items():
+            # TODO, this should be done somewhere for non-initialised things,
+            # probably outside of the graph.py to increase speed
+            if vdata['info'][0].incoming_edges is None:
+                for v in vdata['info']:
+                    incoming = {etype: [e for e in edata['info'] if e.receiver.id == v.id] for etype, edata in self._edges.items()}
+                    outgoing = {etype: [e for e in edata['info'] if e.sender.id == v.id] for etype, edata in self._edges.items()}
+                    v.incoming_edges = incoming
+                    v.outgoing_edges = outgoing
 
     def num_vertices(self, type):
         return self._vertices[type]['data'].shape[0]
@@ -189,40 +215,11 @@ class DirectedGraph(Graph):
         else:
             return self._edges[edge_type]['info'][id].receiver
 
-    def incoming_edges(self, id=None, vertex_type=None):
-        #TODO implement 'all' for vertex_type and make it reserved key for the dict
-        vertex_type = self.default_vertex_type if vertex_type is None else vertex_type
+    def incoming_edges(self, vid, vertex_type, edge_type):
+        return self._vertices[vertex_type]['info'][vid].incoming_edges[edge_type]
 
-        if id is None:
-            # list of dicts of lists here
-            incoming = []
-            for v_id in range(self.num_vertices(vertex_type)):
-                curr_v = {}
-                for k, v in self._edges.items():
-                    curr_v[k] = [el for el in v['info'] if el.receiver.id == v_id and el.receiver.type == vertex_type]
-                incoming.append(curr_v)
-        else:
-            # dict of lists here
-            incoming = {}
-            for k, v in self._edges.items():
-                incoming[k] = [el for el in v['info'] if el.receiver.id == id and el.receiver.type == vertex_type]
-        return incoming
-
-    def outgoing_edges(self, id=None, vertex_type=None):
-        vertex_type = self.default_vertex_type if vertex_type is None else vertex_type
-
-        if id is None:
-            outgoing = []
-            for v_id in range(self.num_vertices(vertex_type)):
-                curr_v = {}
-                for k, v in self._edges.items():
-                    curr_v[k] = [el for el in v['info'] if el.sender.id == v_id and el.sender.type == vertex_type]
-                outgoing.append(curr_v)
-        else:
-            outgoing = {}
-            for k, v in self._edges.items():
-                outgoing[k] = [el for el in v['info'] if el.sender.id == id and el.sender.type == vertex_type]
-        return outgoing
+    def outgoing_edges(self, vid, vertex_type, edge_type):
+        return self._vertices[vertex_type]['info'][vid].outgoing_edges[edge_type]
 
     @property
     def default_vertex_type(self):
@@ -242,13 +239,12 @@ class DirectedGraph(Graph):
 
         for vt in self.vertex_types:
             print("Vertices of type '%s'" % vt)
-
             for vid, vinfo in enumerate(self._vertices[vt]['info']):
                 print("Vertex with id: %d, data: %s, incoming edges ids: %s, outcoming edges ids: %s, type: %s." %
                       (vid,
                        str(self._vertices[vt]['data'][vid]),
-                       [el.id for el in self.incoming_edges(id=vid, vertex_type=vinfo.type)['edge']],
-                       [el.id for el in self.outgoing_edges(id=vid, vertex_type=vinfo.type)['edge']],
+                       [el.id for el in self.incoming_edges(vid, vinfo.type, 'edge')],
+                       [el.id for el in self.outgoing_edges(vid, vinfo.type, 'edge')],
                        vinfo.type)
                       )
 

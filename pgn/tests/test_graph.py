@@ -9,16 +9,16 @@ class TestGraph(unittest.TestCase):
 
     def setUp(self):
         vinfo = [Vertex(id=i) for i in range(2)]
-        vertices = {'data': torch.Tensor([[0], [1]]), 'info': vinfo}
+        vertices = {'vertex': {'data': torch.Tensor([[0], [1]]), 'info': vinfo}}
 
-        edges = {'data': torch.Tensor([[0], [1], [2]]),
+        edges = {'edge': {'data': torch.Tensor([[0], [1], [2]]),
                  'info': [
                      DirectedEdge(0, vinfo[0], vinfo[1]),
                      DirectedEdge(1, vinfo[0], vinfo[1]),
                      DirectedEdge(2, vinfo[1], vinfo[0])
-                 ]}
+                 ]}}
 
-        self.g = graph.DirectedGraph([vertices, edges])
+        self.g = graph.DirectedGraph({'vertex': vertices, 'edge':edges})
 
     def test_graph_build(self):
         self.assertEqual(self.g.vertex_data()['vertex'][0], 0)
@@ -29,12 +29,11 @@ class TestGraph(unittest.TestCase):
         self.assertEqual(self.g.edge_data()['edge'][2], 2)
 
         # test with id output
-        self.assertEqual(set(el.id for el in self.g.incoming_edges(0)['edge']), {2})
-        self.assertEqual(set(el.id for el in self.g.outgoing_edges(0)['edge']), {0, 1})
+        self.assertEqual(set(el.id for el in self.g.incoming_edges(0, 'vertex', 'edge')), {2})
+        self.assertEqual(set(el.id for el in self.g.outgoing_edges(0, 'vertex', 'edge')), {0, 1})
 
-        # test with list output
-        self.assertEqual(set(el.id for el in self.g.incoming_edges()[1]['edge']), {0, 1})
-        self.assertEqual(set(el.id for el in  self.g.outgoing_edges()[1]['edge']), {2})
+        self.assertEqual(set(el.id for el in self.g.incoming_edges(1, 'vertex', 'edge')), {0, 1})
+        self.assertEqual(set(el.id for el in self.g.outgoing_edges(1, 'vertex', 'edge')), {2})
 
         # test with id output
         self.assertEqual(self.g.senders(1).id, 0)
