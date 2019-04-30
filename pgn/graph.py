@@ -77,9 +77,6 @@ class DirectedGraph(Graph):
         self._edges = {k: v.copy() for k,v in entities['edge'].items()}
 
         for t, v in self._vertices.items():
-            if v['data'] is not None and not isinstance(v['data'], torch.Tensor):
-                v['data'] = torch.Tensor(v['data'])
-
             for vid, el in enumerate(v['info']):
                 if vid != el.id:
                     raise ValueError(
@@ -91,9 +88,6 @@ class DirectedGraph(Graph):
                                  "from the number of edges in the 'info' list" % t)
 
         for t, v in self._edges.items():
-            if v['data'] is not None and not isinstance(v['data'], torch.Tensor):
-                v['data'] = torch.Tensor(v['data'])
-
             for eid, el in enumerate(v['info']):
                 if eid != el.id:
                     raise ValueError(

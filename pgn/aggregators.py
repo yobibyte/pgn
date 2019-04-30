@@ -28,7 +28,7 @@ class Aggregator(nn.Module):
 
         """
         if type(X) == list:
-            return torch.Tensor(X)
+            raise ValueError('WTF, man, everything should be tensors here!')
         return X
 
     @property
