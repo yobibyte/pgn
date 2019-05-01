@@ -53,7 +53,7 @@ class NodeBlock(Block):
                     if isinstance(g, pg.DirectedGraphWithContext):
                         updater_input[vt] = torch.cat((aggregated, vdata[vt], cdata.repeat(10,1)), dim=1)
                     else:
-                        torch.cat((aggregated, vdata[vt].repeat(10, 1)), dim=1)
+                        torch.cat((aggregated, vdata[vt]]), dim=1)
             updater_input_list.append(updater_input)
 
         out = [{} for _ in range(len(Gs))]
