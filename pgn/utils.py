@@ -3,7 +3,7 @@ import torch
 from networkx.drawing.nx_agraph import to_agraph
 from pgn.graph import DirectedEdge, DirectedGraph, Vertex
 import cProfile
-
+import time
 
 EDGE_COLOURS = {'edge': 'black', 'action': 'black', 'relation': 'orange'}
 LAYOUTS = ['neato', 'dot', 'twopi', 'circo', 'fdp', 'sfdp']
@@ -69,6 +69,17 @@ def profileit(name):
             # Note use of name from outer scope
             prof.dump_stats(name)
             return retval
+        return wrapper
+    return inner
+
+def timeit(name):
+    def inner(func):
+        def wrapper(*args, **kwargs):
+            ts = time.time()
+            result = func(*args, **kwargs)
+            te = time.time()
+            print('%s, took: %2.4f sec' % (name, te-ts))
+            return result
         return wrapper
     return inner
 
