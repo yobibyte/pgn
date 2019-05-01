@@ -97,12 +97,19 @@ class EdgeBlock(Block):
                 if self._independent:
                     updater_input[et] = edata
                 else:
-                    # TODO torch concat along axis 0? or 1?
-                    # TODO pad till largest here
-                    sender_data = torch.stack(
-                        [vertex_data[einfo[e].receiver.type][einfo[e].receiver.id] for e in range(n_edges)])
-                    receiver_data = torch.stack([vertex_data[einfo[e].sender.type][einfo[e].sender.id] for e in
-                                                 range(n_edges)])
+                    if g.num_vertex_types == 1:
+                        vtype = einfo[0].receiver.type
+                        sender_ids = [einfo[e].sender.id for e in range(n_edges)]
+                        receiver_ids = [einfo[e].receiver.id for e in range(n_edges)]
+                        receiver_data = vertex_data[vtype][receiver_ids]
+                        sender_data = vertex_data[vtype][sender_ids]
+                    else:
+                        # TODO torch concat along axis 0? or 1?
+                        # TODO pad till largest here
+                        receiver_data = torch.stack(
+                            [vertex_data[einfo[e].receiver.type][einfo[e].receiver.id] for e in range(n_edges)])
+                        sender_data = torch.stack([vertex_data[einfo[e].sender.type][einfo[e].sender.id] for e in
+                                                     range(n_edges)])
                     if isinstance(g, pg.DirectedGraphWithContext):
                         cdatarepeat = cdata.repeat(n_edges, 1)
 
