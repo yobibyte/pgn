@@ -93,7 +93,7 @@ class EdgeBlock(Block):
             updater_input = {}
             vertex_data = g.vertex_data()
 
-            cdata = g.context_data(concat=True)
+            cdata = g.context_data(concat=True) if isinstance(g, pg.DirectedGraphWithContext) else None
             for et, edata in g.edge_data().items():
                 n_edges = g.num_edges(et)
                 einfo = g.edge_info(et)
