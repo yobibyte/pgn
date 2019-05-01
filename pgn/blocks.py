@@ -92,24 +92,26 @@ class EdgeBlock(Block):
         for g in Gs:
             updater_input = {}
             vertex_data = g.vertex_data()
+
+            cdata = g.context_data(concat=True)
             for et, edata in g.edge_data().items():
+                n_edges = g.num_edges(et)
                 einfo = g.edge_info(et)
                 if self._independent:
                     updater_input[et] = edata
                 else:
                     # TODO torch concat along axis 0? or 1?
                     # TODO pad till largest here
+                    sender_data = torch.stack(
+                        [vertex_data[einfo[e].receiver.type][einfo[e].receiver.id] for e in range(n_edges)])
+                    receiver_data = torch.stack([vertex_data[einfo[e].sender.type][einfo[e].sender.id] for e in
+                                                 range(n_edges)])
                     if isinstance(g, pg.DirectedGraphWithContext):
-                        inpt = [torch.cat([edata[e],
-                                           vertex_data[einfo[e].receiver.type][einfo[e].receiver.id],
-                                           vertex_data[einfo[e].sender.type][einfo[e].sender.id],
-                                           g.context_data(concat=True)]) for e in range(g.num_edges(et))]
+                        cdatarepeat = cdata.repeat(n_edges, 1)
+
+                        updater_input[et] = torch.cat((edata, sender_data, receiver_data, cdatarepeat), dim=1)
                     else:
-                        inpt = [torch.cat([edata[e],
-                                           vertex_data[einfo[e].receiver.type][einfo[e].receiver.id],
-                                           vertex_data[einfo[e].sender.type][einfo[e].sender.id],
-                                           ]) for e in range(g.num_edges(et))]
-                    updater_input[et] = torch.stack(inpt)
+                        updater_input[et] = torch.cat((edata, sender_data, receiver_data), dim=1)
             updater_input_list.append(updater_input)
 
         out = [{} for _ in range(len(Gs))]

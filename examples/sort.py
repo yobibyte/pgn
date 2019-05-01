@@ -149,6 +149,8 @@ if __name__ == '__main__':
     optimiser = torch.optim.Adam(lr=0.001, params=model.parameters())
     criterion = nn.BCEWithLogitsLoss()
 
+
+
     for e in range(args.epochs):
         st_time = time.time()
 

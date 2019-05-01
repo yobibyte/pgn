@@ -2,6 +2,8 @@ import networkx as nx
 import torch
 from networkx.drawing.nx_agraph import to_agraph
 from pgn.graph import DirectedEdge, DirectedGraph, Vertex
+import cProfile
+
 
 EDGE_COLOURS = {'edge': 'black', 'action': 'black', 'relation': 'orange'}
 LAYOUTS = ['neato', 'dot', 'twopi', 'circo', 'fdp', 'sfdp']
@@ -57,6 +59,18 @@ def plot_graph(g, fname='graph.pdf'):
     a.layout('circo')
     a.draw(fname)
 
+
+def profileit(name):
+    # https://stackoverflow.com/a/5376616
+    def inner(func):
+        def wrapper(*args, **kwargs):
+            prof = cProfile.Profile()
+            retval = prof.runcall(func, *args, **kwargs)
+            # Note use of name from outer scope
+            prof.dump_stats(name)
+            return retval
+        return wrapper
+    return inner
 
 if __name__ == '__main__':
     g = generate_graph()

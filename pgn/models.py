@@ -36,7 +36,6 @@ def get_mlp_updaters(input_node_size, output_node_size, input_edge_size, output_
             if with_global else None
     return node_updater, edge_updater, global_updater
 
-
 class EncoderCoreDecoder(nn.Module):
 
     def __init__(self, core_steps, enc_vertex_shape, core_vertex_shape, dec_vertex_shape, out_vertex_size,
