@@ -30,6 +30,7 @@ class NodeBlock(Block):
             updater_input = {}
             vdata = g.vertex_data()
             edata = g.edge_data()
+            cdata = g.context_data(concat=True) if isinstance(g, pg.DirectedGraphWithContext) else None
             for vt in vdata:
                 if self._independent:
                     updater_input[vt] = vdata[vt]
@@ -49,14 +50,10 @@ class NodeBlock(Block):
 
                     # TODO the dims should be [node, aggregated features], check this thoroughly
                     aggregated = torch.cat(in_aggregated + out_aggregated, dim=1)
-
                     if isinstance(g, pg.DirectedGraphWithContext):
-                        updater_input[vt] = torch.stack(
-                            [torch.cat([aggregated[nid], vdata[vt][nid], g.context_data(concat=True)]) for nid in
-                             range(g.num_vertices(vt))])
+                        updater_input[vt] = torch.cat((aggregated, vdata[vt], cdata.repeat(10,1)), dim=1)
                     else:
-                        updater_input[vt] = torch.stack(
-                            [torch.cat([aggregated[nid], vdata[vt][nid]]) for nid in range(g.num_vertices(vt))])
+                        torch.cat((aggregated, vdata[vt].repeat(10, 1)), dim=1)
             updater_input_list.append(updater_input)
 
         out = [{} for _ in range(len(Gs))]
