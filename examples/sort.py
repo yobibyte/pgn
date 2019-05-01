@@ -127,11 +127,14 @@ if __name__ == '__main__':
     if args.plot_graph_sample:
         ng = pgn2nx(train_input[0])
         plot_graph(ng, fname='input_graph.pdf')
-
+    
     if args.cuda and torch.cuda.is_available():
-        for el in train_input + train_target + eval_input + eval_target:
+        for el in train_input + eval_input:
             for d in el.values():
-                d['data'].to('cuda')
+                d['data'] = d['data'].to('cuda')
+        for el in train_target + eval_target:
+            for k in el.keys():
+                el[k] = el[k].to('cuda')
         model.to('cuda')
 
     # the library expects the data to be in the form of
@@ -175,8 +178,6 @@ if __name__ == '__main__':
     test_g['vertex'] = {'vertex': test_g['vertex']}
     test_g['edge'] = {'edge': test_g['edge']}
     test_g['context'] = {'context': test_g['context']}
-
-
 
     if args.cuda and torch.cuda.is_available():
         test_g.to('cuda')
