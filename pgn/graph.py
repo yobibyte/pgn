@@ -73,8 +73,8 @@ class DirectedGraph(Graph):
         # and the value is the dict with the 'data' and 'info' which has a list of all the entities where their index
         # in the array corresponds to the index in the fist dimension of the data tensor
         # [{'data': tf.Tensor, 'info': []}, ]
-        self._vertices = {k: v.copy() for k,v in entities['vertex'].items()}
-        self._edges = {k: v.copy() for k,v in entities['edge'].items()}
+        self._vertices = {k: v.copy() for k, v in entities['vertex'].items()}
+        self._edges = {k: v.copy() for k, v in entities['edge'].items()}
 
         for t, v in self._vertices.items():
             for vid, el in enumerate(v['info']):
