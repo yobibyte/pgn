@@ -110,16 +110,6 @@ class DirectedGraph(Graph):
                         "Receiver %d for edge %d of type %s is invalid. It's either its id is negative or bigger "
                         "then number of your nodes. " % (e.receiver.id, e.id, e.type))
 
-        for t, vdata in self._vertices.items():
-            # TODO, this should be done somewhere for non-initialised things,
-            # probably outside of the graph.py to increase speed
-            if vdata['info'][0].incoming_edges is None:
-                for v in vdata['info']:
-                    incoming = {etype: [e for e in edata['info'] if e.receiver.id == v.id] for etype, edata in self._edges.items()}
-                    outgoing = {etype: [e for e in edata['info'] if e.sender.id == v.id] for etype, edata in self._edges.items()}
-                    v.incoming_edges = incoming
-                    v.outgoing_edges = outgoing
-
     def num_vertices(self, type):
         return self._vertices[type]['data'].shape[0]
 
