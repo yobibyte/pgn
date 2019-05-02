@@ -17,7 +17,7 @@ class TestAggregators(unittest.TestCase):
             torch.Tensor won't have same dimensions for e2n aggregator input!
         '''
         ag = aggregators.MeanAggregator()
-        a = [[[1], [2], [3]], [[3], [4]]]
+        a = [torch.Tensor([[1], [2], [3]]), torch.Tensor([[3], [4]])]
         torch.testing.assert_allclose(ag.forward(a), [[2], [3.5]])
 
 
