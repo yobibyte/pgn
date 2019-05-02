@@ -1,5 +1,3 @@
-from copy import deepcopy
-
 import torch
 
 
@@ -254,7 +252,7 @@ class DirectedGraph(Graph):
         for vtype, vdata in self._vertices.items():
             vdict = {'info': vdata['info']}
             if zero_data:
-                vdict['data'] = torch.zeros_like(vdata['data'])
+                vdict['data'] = None
             else:
                 vdict['data'] = vdata['data']
             entities['vertex'][vtype] = vdict
@@ -262,18 +260,11 @@ class DirectedGraph(Graph):
         for etype, edata in self._edges.items():
             edict = {'info': edata['info']}
             if zero_data:
-                edict['data'] = torch.zeros_like(edata['data'])
+                edict['data'] = None
             else:
                 edict['data'] = edata['data']
             entities['edge'][etype] = edict
         return entities
-
-    def get_deep_coopy(self):
-        # TODO
-        return NotImplementedError
-
-    def get_copy(self):
-        return self.__class__(self.get_entities(zero_data=False))
 
     def get_graph_with_same_topology(self):
         return self.__class__(self.get_entities(zero_data=True))

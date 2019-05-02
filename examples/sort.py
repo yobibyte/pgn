@@ -54,14 +54,14 @@ def edge_id_by_sender_and_receiver(metadata, sid, rid):
 
 def create_target_data(input_data):
     # two nodes might have true since they might have similar values
-    min_value = input_data['vertex']['data'].min()
+    min_val = input_data['vertex']['data'].min()
 
     # [prob_true, prob_false]
-    target_vertex_data = \
-        torch.Tensor([[1.0, 0.0] if v == min_value else [0.0, 1.0] for v in input_data['vertex']['data']])
+    target_vertex_data = torch.Tensor([[1.0, 0.0] if v == min_val else [0.0, 1.0] for v in input_data['vertex']['data']])
 
-    sorted_ids = input_data['vertex']['data'].argsort()
+    sorted_ids = input_data['vertex']['data'].argsort(dim=0).flatten()
     target_edge_data = torch.zeros(input_data['edge']['data'].shape[0], 2)
+
     for sidx, sid in enumerate(sorted_ids):
         for ridx, rid in enumerate(sorted_ids):
             eid = edge_id_by_sender_and_receiver(input_data['edge']['info'], sid, rid)
@@ -159,11 +159,8 @@ if __name__ == '__main__':
     optimiser = torch.optim.Adam(lr=0.001, params=model.parameters())
     criterion = nn.BCEWithLogitsLoss()
 
-
-
     for e in range(args.epochs):
         st_time = time.time()
-
 
         train_outs = model.process_batch(train_input)
         train_loss = batch_loss(train_outs, train_target, criterion)
