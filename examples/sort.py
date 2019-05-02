@@ -38,6 +38,7 @@ def graph_data_from_list(input_list):
                                 range(len(connectivity))]},
                   'context': {'data': torch.Tensor([[0]]), 'info': [Context(0)]}
                   }
+    add_connectivity(graph_data)
     return graph_data
 
 def edge_id_by_sender_and_receiver(metadata, sid, rid):
@@ -73,6 +74,12 @@ def create_target_data(input_data):
     return {'vertex': target_vertex_data,
             'edge': target_edge_data}
 
+def add_connectivity(entities):
+    for v in entities['vertex']['info']:
+        incoming = {'edge': [e for e in entities['edge']['info'] if e.receiver.id == v.id]}
+        outgoing = {'edge': [e for e in entities['edge']['info'] if e.sender.id == v.id]}
+        v.incoming_edges = incoming
+        v.outgoing_edges = outgoing
 
 def generate_graph_batch(n_examples, sample_length, target=True):
     input_data = [graph_data_from_list(np.random.uniform(size=sample_length)) for _ in range(n_examples)]
