@@ -256,7 +256,7 @@ class DirectedGraph(Graph):
             if zero_data:
                 vdict['data'] = torch.zeros_like(vdata['data'])
             else:
-                vdict['data'] = vdata['data'].clone()
+                vdict['data'] = vdata['data']
             entities['vertex'][vtype] = vdict
 
         for etype, edata in self._edges.items():
@@ -264,7 +264,7 @@ class DirectedGraph(Graph):
             if zero_data:
                 edict['data'] = torch.zeros_like(edata['data'])
             else:
-                edict['data'] = edata['data'].clone()
+                edict['data'] = edata['data']
             entities['edge'][etype] = edict
         return entities
 
@@ -392,7 +392,7 @@ class DirectedGraphWithContext(DirectedGraph):
         entities['context'] = {}
         for ctype, cdata in self._context.items():
             entities['context'][ctype] = {
-                                'data': cdata['data'].clone() if not zero_data else None,
+                                'data': cdata['data'] if not zero_data else None,
                                 'info': cdata['info']
                                }
         return entities
