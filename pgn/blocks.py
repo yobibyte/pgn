@@ -111,9 +111,7 @@ class EdgeBlock(Block):
                         sender_data = torch.stack([vertex_data[einfo[e].sender.type][einfo[e].sender.id] for e in
                                                      range(n_edges)])
                     if isinstance(g, pg.DirectedGraphWithContext):
-                        cdatarepeat = cdata.repeat(n_edges, 1)
-
-                        updater_input[et] = torch.cat((edata, sender_data, receiver_data, cdatarepeat), dim=1)
+                        updater_input[et] = torch.cat((edata, sender_data, receiver_data, cdata.repeat(n_edges, 1)), dim=1)
                     else:
                         updater_input[et] = torch.cat((edata, sender_data, receiver_data), dim=1)
             updater_input_list.append(updater_input)

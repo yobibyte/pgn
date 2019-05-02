@@ -9,24 +9,34 @@ class TestGraph(unittest.TestCase):
 
     def setUp(self):
         vinfo = [Vertex(id=i) for i in range(2)]
-        vertices = {'vertex': {'data': torch.Tensor([[0], [1]]), 'info': vinfo}}
-
-        edges = {'edge': {'data': torch.Tensor([[0], [1], [2]]),
+        # fist dimension is a graph
+        # second dimension is a entity id
+        # third dimension (and all consequent) are feature dims for the particular entities
+        vertices = {'vertex': {'data': torch.Tensor([[[0], [1]], [[2], [3]]]), 'info': vinfo}}
+        edges = {'edge': {'data': torch.Tensor([[[0], [1], [2]], [[3], [4], [5]]]),
                  'info': [
                      DirectedEdge(0, vinfo[0], vinfo[1]),
                      DirectedEdge(1, vinfo[0], vinfo[1]),
                      DirectedEdge(2, vinfo[1], vinfo[0])
                  ]}}
 
-        self.g = graph.DirectedGraph({'vertex': vertices, 'edge':edges})
+        self.g = graph.DirectedGraph({'vertex': vertices, 'edge': edges})
 
     def test_graph_build(self):
-        self.assertEqual(self.g.vertex_data()['vertex'][0], 0)
-        self.assertEqual(self.g.vertex_data()['vertex'][1], 1)
 
-        self.assertEqual(self.g.edge_data()['edge'][0], 0)
-        self.assertEqual(self.g.edge_data()['edge'][1], 1)
-        self.assertEqual(self.g.edge_data()['edge'][2], 2)
+        # check first graph data
+        self.assertEqual(self.g.vertex_data()['vertex'][0][0], 0)
+        self.assertEqual(self.g.vertex_data()['vertex'][0][1], 1)
+        self.assertEqual(self.g.edge_data()['edge'][0][0], 0)
+        self.assertEqual(self.g.edge_data()['edge'][0][1], 1)
+        self.assertEqual(self.g.edge_data()['edge'][0][2], 2)
+
+        # check second graph data
+        self.assertEqual(self.g.vertex_data()['vertex'][1][0], 2)
+        self.assertEqual(self.g.vertex_data()['vertex'][1][1], 3)
+        self.assertEqual(self.g.edge_data()['edge'][1][0], 3)
+        self.assertEqual(self.g.edge_data()['edge'][1][1], 4)
+        self.assertEqual(self.g.edge_data()['edge'][1][2], 5)
 
         # test with id output
         self.assertEqual(set(el.id for el in self.g.incoming_edges(0, 'vertex', 'edge')), {2})

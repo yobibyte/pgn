@@ -76,6 +76,21 @@ class DirectedGraph(Graph):
         self._vertices = {k: v.copy() for k,v in entities['vertex'].items()}
         self._edges = {k: v.copy() for k,v in entities['edge'].items()}
 
+        # we probably need a flat to turn these off to make the code faster
+        self.safety_checks()
+
+        for t, vdata in self._vertices.items():
+            # TODO, this should be done somewhere for non-initialised things,
+            # probably outside of the graph.py to increase speed
+            if vdata['info'][0].incoming_edges is None:
+                for v in vdata['info']:
+                    incoming = {etype: [e for e in edata['info'] if e.receiver.id == v.id] for etype, edata in self._edges.items()}
+                    outgoing = {etype: [e for e in edata['info'] if e.sender.id == v.id] for etype, edata in self._edges.items()}
+                    v.incoming_edges = incoming
+                    v.outgoing_edges = outgoing
+
+
+    def safety_checks(self):
         for t, v in self._vertices.items():
             for vid, el in enumerate(v['info']):
                 if vid != el.id:
@@ -110,21 +125,11 @@ class DirectedGraph(Graph):
                         "Receiver %d for edge %d of type %s is invalid. It's either its id is negative or bigger "
                         "then number of your nodes. " % (e.receiver.id, e.id, e.type))
 
-        for t, vdata in self._vertices.items():
-            # TODO, this should be done somewhere for non-initialised things,
-            # probably outside of the graph.py to increase speed
-            if vdata['info'][0].incoming_edges is None:
-                for v in vdata['info']:
-                    incoming = {etype: [e for e in edata['info'] if e.receiver.id == v.id] for etype, edata in self._edges.items()}
-                    outgoing = {etype: [e for e in edata['info'] if e.sender.id == v.id] for etype, edata in self._edges.items()}
-                    v.incoming_edges = incoming
-                    v.outgoing_edges = outgoing
-
     def num_vertices(self, type):
-        return self._vertices[type]['data'].shape[0]
+        return self._vertices[type]['data'][0].shape[0]
 
     def num_edges(self, type):
-        return self._edges[type]['data'].shape[0]
+        return self._edges[type]['data'][0].shape[0]
 
     @property
     def num_edge_types(self):
@@ -234,24 +239,28 @@ class DirectedGraph(Graph):
         for vt in self.vertex_types:
             print("Vertices of type '%s'" % vt)
             for vid, vinfo in enumerate(self._vertices[vt]['info']):
-                print("Vertex with id: %d, data: %s, incoming edges ids: %s, outcoming edges ids: %s, type: %s." %
+                print("Vertex with id: %d, incoming edges ids: %s, outcoming edges ids: %s, type: %s." %
                       (vid,
-                       str(self._vertices[vt]['data'][vid]),
                        [el.id for el in self.incoming_edges(vid, vinfo.type, 'edge')],
                        [el.id for el in self.outgoing_edges(vid, vinfo.type, 'edge')],
                        vinfo.type)
                       )
+                for gid in range(self._vertices[vt]['data'].shape[0]):
+                    print("----> Graph {}, data: ".format(gid, str(self._vertices[vt]['data'][gid][vid])))
+
 
         for et in self.edge_types:
             print("Edges of type '%s'" % et)
             for eid, einfo in enumerate(self._edges[et]['info']):
-                print("Edge with id: %d, data: %s, sender id: %d, receiver id: %d, type: %s." %
-                      (eid,
-                       str(self._edges[et]['data'][eid]),
-                       einfo.sender.id,
-                       einfo.receiver.id,
-                       einfo.type)
-                      )
+                print("Edge with id: %d, sender id: %d, receiver id: %d, type: %s." %
+                      (eid, einfo.sender.id, einfo.receiver.id, einfo.type))
+                for gid in range(self._edges[et]['data'].shape[0]):
+                    print("----> Graph {}, data: ".format(gid, str(self._edges[et]['data'][gid][eid])))
+
+    @property
+    def n_graphs(self):
+        #TODO implement a function returing the number of graphs in the batch
+        raise NotImplementedError
 
     def get_entities(self, zero_data=False):
         entities = {'vertex': {}, 'edge': {}}
