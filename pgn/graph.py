@@ -67,7 +67,7 @@ class Graph(object):
     pass
 
 class DirectedGraph(Graph):
-    def __init__(self, entities):
+    def __init__(self, entities, safemode=False):
 
         # entities is a dict, where the key stands for the entity type,
         # and the value is the dict with the 'data' and 'info' which has a list of all the entities where their index
@@ -76,6 +76,10 @@ class DirectedGraph(Graph):
         self._vertices = {k: v.copy() for k, v in entities['vertex'].items()}
         self._edges = {k: v.copy() for k, v in entities['edge'].items()}
 
+        if safemode:
+            self.safety_check()
+
+    def safety_check(self):
         for t, v in self._vertices.items():
             for vid, el in enumerate(v['info']):
                 if vid != el.id:
@@ -109,6 +113,7 @@ class DirectedGraph(Graph):
                     raise ValueError(
                         "Receiver %d for edge %d of type %s is invalid. It's either its id is negative or bigger "
                         "then number of your nodes. " % (e.receiver.id, e.id, e.type))
+
 
     def num_vertices(self, type):
         return self._vertices[type]['data'].shape[0]
