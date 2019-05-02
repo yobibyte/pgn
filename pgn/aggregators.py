@@ -26,6 +26,6 @@ class MeanAggregator(Aggregator):
         # We can't simply batch this since the sublists can be of unequal length.
         # We either need to do this in a for loop or pad in a smart way
         # (simple padding will affect the average results, for instance).
-        ret = pad_sequence(X, batch_first=True).sum(dim=1)/torch.Tensor([[el.shape[0]] for el in X], device=X.device)
+        ret = pad_sequence(X, batch_first=True).sum(dim=1)/torch.Tensor([[el.shape[0]] for el in X], device=X[0].device)
         ret[ret != ret] = 0.0
         return ret
