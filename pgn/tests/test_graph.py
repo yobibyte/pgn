@@ -17,7 +17,11 @@ class TestGraph(unittest.TestCase):
                      DirectedEdge(1, vinfo[0], vinfo[1]),
                      DirectedEdge(2, vinfo[1], vinfo[0])
                  ]}}
-
+        for v in vertices['vertex']['info']:
+            incoming = {'edge': [e for e in edges['edge']['info'] if e.receiver.id == v.id]}
+            outgoing = {'edge': [e for e in edges['edge']['info'] if e.sender.id == v.id]}
+            v.incoming_edges = incoming
+            v.outgoing_edges = outgoing
         self.g = graph.DirectedGraph({'vertex': vertices, 'edge':edges})
 
     def test_graph_build(self):
