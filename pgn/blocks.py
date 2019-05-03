@@ -2,7 +2,7 @@ import pgn.graph as pg
 
 import torch
 import torch.nn as nn
-
+from pgn.utils import profileit
 class Block(nn.Module):
     def __init__(self, independent):
         super().__init__()
@@ -21,6 +21,7 @@ class NodeBlock(Block):
         self._in_e2n_aggregators = in_e2n_aggregators
         self._out_e2n_aggregators = out_e2n_aggregators
 
+    @profileit('forward.p')
     def forward(self, Gs):
         if isinstance(Gs, pg.Graph):
             Gs = [Gs]
@@ -37,15 +38,15 @@ class NodeBlock(Block):
                 else:
                     in_aggregated = []
                     if self._in_e2n_aggregators is not None:
-                        # TODO rewrite if the order of concat matters
                         for at in self._in_e2n_aggregators:
-                            agg_input = [edata[at][list(map(lambda x: x.id, g.incoming_edges(nid, vt, at)))] for nid in range(g.num_vertices(vt))]
+                            agg_input =  [edata[at][g.incoming_edges(nid, vt, at, ids_only=True)] for nid in range(g.num_vertices(vt))]
                             in_aggregated.append(self._in_e2n_aggregators[at](agg_input))
 
                     out_aggregated = []
                     if self._out_e2n_aggregators is not None:
                         for at in self._out_e2n_aggregators:
-                            agg_input = [edata[at][list(map(lambda x: x.id, g.outgoing_edges(nid, vt, at)))] for nid in range(g.num_vertices(vt))]
+                            agg_input = [edata[at][g.outgoing(nid, vt, at, ids_only=True)] for nid in
+                                         range(g.num_vertices(vt))]
                             out_aggregated.append(self._out_e2n_aggregators[at](agg_input))
 
                     # TODO the dims should be [node, aggregated features], check this thoroughly

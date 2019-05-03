@@ -202,11 +202,17 @@ class DirectedGraph(Graph):
         else:
             return self._edges[edge_type]['info'][id].receiver
 
-    def incoming_edges(self, vid, vertex_type, edge_type):
-        return self._vertices[vertex_type]['info'][vid].incoming_edges[edge_type]
+    def incoming_edges(self, vid, vertex_type, edge_type, ids_only=False):
+        res = self._vertices[vertex_type]['info'][vid].incoming_edges[edge_type]
+        if ids_only:
+            return [el.id for el in res]
+        return res
 
-    def outgoing_edges(self, vid, vertex_type, edge_type):
-        return self._vertices[vertex_type]['info'][vid].outgoing_edges[edge_type]
+    def outgoing_edges(self, vid, vertex_type, edge_type, ids_only=False):
+        res = self._vertices[vertex_type]['info'][vid].outgoing_edges[edge_type]
+        if ids_only:
+            return [el.id for el in res]
+        return res
 
     @property
     def default_vertex_type(self):
