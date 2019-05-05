@@ -196,9 +196,4 @@ if __name__ == '__main__':
     sort_indices = np.argsort(unsorted)
     plt.matshow(mx[sort_indices][:, sort_indices], cmap="viridis")
     plt.grid(False)
-    try:
-        plt.show()
-    except:
-        print("Wasn't able to show the plot. But I'll save it for sure.")
-    finally:
-        plt.savefig('pgn_sorting_output.png')
+    plt.savefig('pgn_sorting_output.png')
