@@ -3,59 +3,22 @@ import torch
 
 class Entity(object):
     def __init__(self, id, type, hidden_info=None):
-        self._id = id
-        self._type = type
-        self._hidden_info = hidden_info
-
-    @property
-    def type(self):
-        return self._type
-
-    @property
-    def id(self):
-        return self._id
-
-    @property
-    def hidden_info(self):
-        return self._hidden_info
-
+        self.id = id
+        self.type = type
+        self.hidden_info = hidden_info
 
 class DirectedEdge(Entity):
     def __init__(self, id, sender, receiver, type='edge', hidden_info=None):
         super().__init__(id, type, hidden_info=hidden_info)
-        self._sender = sender
-        self._receiver = receiver
-
-    @property
-    def sender(self):
-        return self._sender
-
-    @property
-    def receiver(self):
-        return self._receiver
+        self.sender = sender
+        self.receiver = receiver
 
 
 class Vertex(Entity):
     def __init__(self, id, type='vertex', hidden_info=None):
         super().__init__(id, type, hidden_info=hidden_info)
-        self._incoming_edges = None
-        self._outgoing_edges = None
-
-    @property
-    def incoming_edges(self):
-        return self._incoming_edges
-
-    @incoming_edges.setter
-    def incoming_edges(self, incoming_edges):
-        self._incoming_edges = incoming_edges
-
-    @property
-    def outgoing_edges(self):
-        return self._outgoing_edges
-
-    @outgoing_edges.setter
-    def outgoing_edges(self, outgoing_edges):
-        self._outgoing_edges = outgoing_edges
+        self.incoming_edges = None
+        self.outgoing_edges = None
 
 class Context(Entity):
     def __init__(self, id, type='context', hidden_info=None):

@@ -38,7 +38,7 @@ class NodeBlock(Block):
                     in_aggregated = []
                     if self._in_e2n_aggregators is not None:
                         for at in self._in_e2n_aggregators:
-                            agg_input =  [edata[at][g.incoming_edges(nid, vt, at, ids_only=True)] for nid in range(g.num_vertices(vt))]
+                            agg_input = [edata[at][g.incoming_edges(nid, vt, at, ids_only=True)] for nid in range(g.num_vertices(vt))]
                             in_aggregated.append(self._in_e2n_aggregators[at](agg_input))
 
                     out_aggregated = []
