@@ -2,7 +2,7 @@ import pgn.graph as pg
 
 import torch
 import torch.nn as nn
-from pgn.utils import profileit
+
 class Block(nn.Module):
     def __init__(self, independent):
         super().__init__()
@@ -21,7 +21,6 @@ class NodeBlock(Block):
         self._in_e2n_aggregators = in_e2n_aggregators
         self._out_e2n_aggregators = out_e2n_aggregators
 
-    @profileit('forward.p')
     def forward(self, Gs):
         if isinstance(Gs, pg.Graph):
             Gs = [Gs]
