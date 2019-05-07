@@ -3,6 +3,7 @@ import pgn.graph as pg
 import torch
 import torch.nn as nn
 
+
 class Block(nn.Module):
     def __init__(self, independent):
         super().__init__()
@@ -38,14 +39,15 @@ class NodeBlock(Block):
                     in_aggregated = []
                     if self._in_e2n_aggregators is not None:
                         for at in self._in_e2n_aggregators:
-                            agg_input = [edata[at][g.incoming_edges(nid, vt, at, ids_only=True)] for nid in range(g.num_vertices(vt))]
+                            idx = [g.incoming_edges(nid, vt, at, ids_only=True) for nid in range(g.num_vertices(vt))]
+                            agg_input = [edata[at][i] for i in idx]
                             in_aggregated.append(self._in_e2n_aggregators[at](agg_input))
 
                     out_aggregated = []
                     if self._out_e2n_aggregators is not None:
                         for at in self._out_e2n_aggregators:
-                            agg_input = [edata[at][g.outgoing_edges(nid, vt, at, ids_only=True)] for nid in
-                                         range(g.num_vertices(vt))]
+                            idx = [g.outgoing_edges(nid, vt, at, ids_only=True) for nid in range(g.num_vertices(vt))]
+                            agg_input = [edata[at][i] for i in idx]
                             out_aggregated.append(self._out_e2n_aggregators[at](agg_input))
 
                     # TODO the dims should be [node, aggregated features], check this thoroughly
