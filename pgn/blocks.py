@@ -26,40 +26,49 @@ class NodeBlock(Block):
         if isinstance(Gs, pg.Graph):
             Gs = [Gs]
 
-        updater_input_list = []
-        for g in Gs:
-            updater_input = {}
-            vdata = g.vertex_data()
-            edata = g.edge_data()
-            cdata = g.context_data(concat=True) if isinstance(g, pg.DirectedGraphWithContext) else None
-            for vt in vdata:
-                if self._independent:
-                    updater_input[vt] = vdata[vt]
-                else:
-                    in_aggregated = []
-                    if self._in_e2n_aggregators is not None:
-                        for at in self._in_e2n_aggregators:
+        # prepare input
+        vdata = [g.vertex_data() for g in Gs]
+
+        if self._independent:
+            updater_input_list = vdata
+        else:
+            n_graphs = len(Gs)
+            split_mask = [1] * n_graphs
+            edata = [g.edge_data() for g in Gs]
+            cdata = [g.context_data(concat=True) for g in Gs] if isinstance(Gs[0], pg.DirectedGraphWithContext) else None
+            updater_input_list = [{} for _ in range(n_graphs)]
+
+            for vt in vdata[0]:
+                if self._in_e2n_aggregators is not None:
+                    for at in self._in_e2n_aggregators:
+                        agg_input = []
+                        for g_idx, g in enumerate(Gs):
                             idx = [g.incoming_edges(nid, vt, at, ids_only=True) for nid in range(g.num_vertices(vt))]
                             flat = [item for sublist in idx for item in sublist]
-                            agg_input = edata[at][flat].split([len(el) for el in idx])
-                            in_aggregated.append(self._in_e2n_aggregators[at](agg_input))
+                            agg_input.append(edata[g_idx][at][flat].split([len(el) for el in idx]))
+                    # output for all the graphs
+                        aggregated = self._in_e2n_aggregators[at](agg_input)
+                        if cdata is not None:
+                            for g_idx in range(n_graphs):
+                                updater_input_list[g_idx][vt] = torch.cat((aggregated[g_idx], vdata[g_idx][vt], cdata[g_idx].repeat(vdata[g_idx][vt].shape[0], 1)),
+                                                              dim=1)
+                        else:
+                            for g_idx in range(n_graphs):
+                               updater_input_list[g_idx][vt] = torch.cat((aggregated[g_idx], vdata[g_idx][vt]), dim=1)
 
-                    out_aggregated = []
-                    if self._out_e2n_aggregators is not None:
-                        for at in self._out_e2n_aggregators:
-                            idx = [g.outgoing_edges(nid, vt, at, ids_only=True) for nid in range(g.num_vertices(vt))]
-                            flat = [item for sublist in idx for item in sublist]
-                            agg_input = edata[at][flat].split([len(el) for el in idx])
-                            out_aggregated.append(self._out_e2n_aggregators[at](agg_input))
-
+                    # out_aggregated = []
+                    # if self._out_e2n_aggregators is not None:
+                    #     for at in self._out_e2n_aggregators:
+                    #         idx = [g.outgoing_edges(nid, vt, at, ids_only=True) for nid in range(g.num_vertices(vt))]
+                    #         flat = [item for sublist in idx for item in sublist]
+                    #         agg_input = edata[at][flat].split([len(el) for el in idx])
+                    #         out_aggregated.append(self._out_e2n_aggregators[at](agg_input))
                     # TODO the dims should be [node, aggregated features], check this thoroughly
-                    aggregated = torch.cat(in_aggregated + out_aggregated, dim=1)
-                    if isinstance(g, pg.DirectedGraphWithContext):
-                        updater_input[vt] = torch.cat((aggregated, vdata[vt], cdata.repeat(vdata[vt].shape[0], 1)), dim=1)
-                    else:
-                        updater_input[vt] = torch.cat((aggregated, vdata[vt]), dim=1)
-            updater_input_list.append(updater_input)
+                    #aggregated = in_aggregated
+                    #aggregated = torch.cat(in_aggregated + out_aggregated, dim=1)
 
+
+        # make an update
         out = [{} for _ in range(len(Gs))]
         for vt in Gs[0].vertex_types:
             if vt not in self._updaters:
@@ -164,11 +173,11 @@ class GlobalBlock(Block):
                 if not self.independent:
                     for vtype, vdata in g.vertex_data().items():
                         # Aggregate vertex attributes globally
-                        updater_input[t].append(self._vertex_aggregators[vtype]([vdata]))
+                        updater_input[t].append(self._vertex_aggregators[vtype]([[vdata]])[0])
 
                     for etype, edata in g.edge_data().items():
                         # Aggregate edge attributes globally
-                        updater_input[t].append(self._edge_aggregators[etype]([edata]))
+                        updater_input[t].append(self._edge_aggregators[etype]([[edata]])[0])
                 updater_input[t] = torch.cat(updater_input[t], dim=1)
             updater_input_list.append(updater_input)
 

@@ -26,8 +26,21 @@ class MeanAggregator(Aggregator):
         # We can't simply batch this since the sublists can be of unequal length.
         # We either need to do this in a for loop or pad in a smart way
         # (simple padding will affect the average results, for instance).
-        ret = pad_sequence(X, batch_first=True).sum(dim=1)
-        lens = torch.tensor([[el.shape[0]] for el in X], device=X[0].device, dtype=torch.float)
-        ret = ret/lens
-        ret[ret != ret] = 0.0
+
+        # flatten X
+        bsize = len(X)
+        vsize = len(X[0])
+
+        lens = []
+        for g in X:
+            lens.append([[el.shape[1]] for el in g])
+        lens = torch.tensor(lens, device=g[0].device, dtype=torch.float)
+        X = [el for sl in X for el in sl]
+        ret = pad_sequence(X, batch_first=True).reshape(bsize, vsize, -1, X[0].shape[1])
+        ret = ret.sum(dim=2)
+        ret /= lens
+        ret[ret!=ret] = 0.0
+
+        # 0th dim is graph
+        # 1st dim is entity id
         return ret
