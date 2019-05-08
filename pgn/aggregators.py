@@ -30,7 +30,6 @@ class MeanAggregator(Aggregator):
         # flatten X
         bsize = len(X)
         vsize = len(X[0])
-
         lens = []
         for g in X:
             lens.append([[el.shape[1]] for el in g])

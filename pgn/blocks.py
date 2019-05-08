@@ -2,7 +2,7 @@ import pgn.graph as pg
 
 import torch
 import torch.nn as nn
-
+import numpy as np
 
 class Block(nn.Module):
     def __init__(self, independent):
@@ -64,7 +64,7 @@ class NodeBlock(Block):
                                 out_agg_input.append(edata[g_idx][at][flat].split([len(el) for el in idx]))
                         out_aggregated.append(self._out_e2n_aggregators[at](agg_input))
 
-                aggregated = torch.cat(in_aggregated + out_aggregated, dim=1)
+                aggregated = torch.cat(in_aggregated + out_aggregated, dim=2)
 
                 # output for all the graphs
                 if cdata is not None:
@@ -92,54 +92,61 @@ class EdgeBlock(Block):
 
         if isinstance(Gs, pg.Graph):
             Gs = [Gs]
+        out = [{} for _ in Gs]
 
-        updater_input_list = []
+        if self._independent:
+            for et in Gs[0].edge_data():
+                edata = torch.stack([g.edge_data(et) for g in Gs])
+                gout = self._updaters[et](edata)
+                for el_idx, el in enumerate(gout):
+                    out[el_idx][et] = el
+        else:
+            vdata = [g.vertex_data() for g in Gs]
+            cdata = [g.context_data(concat=True) for g in Gs] if isinstance(Gs[0],
+                                                                            pg.DirectedGraphWithContext) else None
 
-        for g in Gs:
-            updater_input = {}
-            vertex_data = g.vertex_data()
+            for et in Gs[0].edge_data():
 
-            cdata = g.context_data(concat=True) if isinstance(g, pg.DirectedGraphWithContext) else None
-            for et, edata in g.edge_data().items():
-                n_edges = g.num_edges(et)
-                einfo = g.edge_info(et)
-                if self._independent:
-                    updater_input[et] = edata
+                n_edges = [g.num_edges(et) for g in Gs]
+                einfo = [g.edge_info(et) for g in Gs]
+                edata = torch.stack([g.edge_data(et) for g in Gs])
+
+                if Gs[0].num_vertex_types == 1:
+                    vtype = einfo[0][0].receiver.type
+
+                    #megavertexdata = torch.stack([el[vtype] for el in vdata])
+                    sender_ids = np.array([[einfo[el_id][e].sender.id for e in range(el)] for el_id, el in enumerate(n_edges)])
+                    receiver_ids = np.array([[einfo[el_id][e].sender.id for e in range(el)] for el_id, el in enumerate(n_edges)])
+
+                    sender_data = []
+                    receiver_data = []
+                    for el_id, el in enumerate(sender_ids):
+                          sender_data.append(vdata[el_id][vtype][el])
+                    for el_id, el in enumerate(receiver_ids):
+                          receiver_data.append(vdata[el_id][vtype][el])
+                    sender_data = torch.stack(sender_data)
+                    receiver_data = torch.stack(receiver_data)
                 else:
-                    if g.num_vertex_types == 1:
-                        vtype = einfo[0].receiver.type
-                        sender_ids = [einfo[e].sender.id for e in range(n_edges)]
-                        receiver_ids = [einfo[e].receiver.id for e in range(n_edges)]
-                        receiver_data = vertex_data[vtype][receiver_ids]
-                        sender_data = vertex_data[vtype][sender_ids]
-                    else:
-                        # TODO torch concat along axis 0? or 1?
-                        # TODO pad till largest here
-                        receiver_data = torch.stack(
-                            [vertex_data[einfo[e].receiver.type][einfo[e].receiver.id] for e in range(n_edges)])
-                        sender_data = torch.stack([vertex_data[einfo[e].sender.type][einfo[e].sender.id] for e in
-                                                     range(n_edges)])
-                    if isinstance(g, pg.DirectedGraphWithContext):
-                        cdatarepeat = cdata.repeat(n_edges, 1)
+                    pass
+                    # TODO torch concat along axis 0? or 1?
+                    # TODO pad till largest here
+                    raise NotImplementedError
+                    # receiver_data = torch.stack(
+                    #     [vertex_data[einfo[e].receiver.type][einfo[e].receiver.id] for e in range(n_edges)])
+                    # sender_data = torch.stack([vertex_data[einfo[e].sender.type][einfo[e].sender.id] for e in
+                    #                              range(n_edges)])
 
-                        updater_input[et] = torch.cat((edata, sender_data, receiver_data, cdatarepeat), dim=1)
-                    else:
-                        updater_input[et] = torch.cat((edata, sender_data, receiver_data), dim=1)
-            updater_input_list.append(updater_input)
+                if cdata is not None:
+                    curr_cdata = [el.repeat(edata[el_id].shape[0], 1) for el_id, el in enumerate(cdata)]
+                    curr_cdata = torch.stack(curr_cdata)
+                    etin = torch.cat((edata, sender_data, receiver_data, curr_cdata), dim=2)
+                else:
+                    etin = torch.cat((edata, sender_data, receiver_data), dim=2)
 
-        out = [{} for _ in range(len(Gs))]
-        for et in Gs[0].edge_types:
-            if et not in self._updaters:
-                for inpt_idx, inpt in enumerate(updater_input_list):
-                    out[inpt_idx][et] = inpt[et]
-            else:
-                # glue all the inputs for the same type
-                all_inpt = torch.cat([el[et] for el in updater_input_list])
-                # we need these to split after we get the output of a batch
-                input_idx = [el[et].shape[0] for el in updater_input_list]
-                all_output = self._updaters[et](all_inpt)
-                for out_idx, el in enumerate(all_output.split(input_idx)):
-                    out[out_idx][et] = el
+                etout = self._updaters[et](etin)
+                for el_idx, el in enumerate(etout):
+                    out[el_idx][et] = el
+
         return out
 
 
@@ -160,36 +167,25 @@ class GlobalBlock(Block):
         if isinstance(Gs, pg.Graph):
             Gs = [Gs]
 
-        updater_input_list = []
-        for g in Gs:
-            updater_input = {}
-
-            for t, cdata in g.context_data().items():
-                updater_input[t] = [cdata]
-                if not self.independent:
-                    for vtype, vdata in g.vertex_data().items():
-                        # Aggregate vertex attributes globally
-                        updater_input[t].append(self._vertex_aggregators[vtype]([[vdata]])[0])
-
-                    for etype, edata in g.edge_data().items():
-                        # Aggregate edge attributes globally
-                        updater_input[t].append(self._edge_aggregators[etype]([[edata]])[0])
-                updater_input[t] = torch.cat(updater_input[t], dim=1)
-            updater_input_list.append(updater_input)
-
         out = [{} for _ in range(len(Gs))]
-        for ct in Gs[0].context_types:
-            if ct not in self._updaters:
-                for inpt_idx, inpt in enumerate(updater_input_list):
-                    out[inpt_idx][ct] = inpt[ct]
+        cdata = [g.context_data() for g in Gs]
+
+        for t in cdata[0]:
+            tin = torch.stack([el[t] for el in cdata])
+            if self._independent:
+                tout = self._updaters[t](tin)
+                for el_idx, el in enumerate(tout):
+                    out[el_idx][t] = el
             else:
-                # glue all the inputs for the same type
-                all_inpt = torch.cat([el[ct] for el in updater_input_list])
-                # we need these to split after we get the output of a batch
-                input_idx = [el[ct].shape[0] for el in updater_input_list]
-                all_outputs = self._updaters[ct](all_inpt)
-                for out_idx, el in enumerate(all_outputs.split(input_idx)):
-                    out[out_idx][ct] = el
+                uin = []
+                for vt, agg in self._vertex_aggregators.items():
+                    uin.append(agg([[g.vertex_data(vt)] for g in Gs]))
+                for et, agg in self._edge_aggregators.items():
+                    uin.append(agg([[g.edge_data(et)] for g in Gs]))
+                tin = torch.cat((tin, *uin), dim=2)
+                tout = self._updaters[t](tin)
+                for el_idx, el in enumerate(tout):
+                    out[el_idx][t] = el
         return out
     
 
