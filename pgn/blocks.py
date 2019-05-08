@@ -64,7 +64,7 @@ class NodeBlock(Block):
                                 out_agg_input.append(edata[g_idx][at][flat].split([len(el) for el in idx]))
                         out_aggregated.append(self._out_e2n_aggregators[at](agg_input))
 
-                aggregated = torch.cat(in_aggregated + out_aggregated, dim=1)
+                aggregated = torch.cat(in_aggregated + out_aggregated, dim=2)
 
                 # output for all the graphs
                 if cdata is not None:
