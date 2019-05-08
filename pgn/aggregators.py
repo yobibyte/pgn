@@ -36,7 +36,7 @@ class MeanAggregator(Aggregator):
             lens.append([[el.shape[1]] for el in g])
         lens = torch.tensor(lens, device=g[0].device, dtype=torch.float)
         X = [el for sl in X for el in sl]
-        ret = pad_sequence(X, batch_first=True).reshape(bsize, vsize, -1, X[0].shape[1])
+        ret = pad_sequence(X, batch_first=True).view(bsize, vsize, -1, X[0].shape[1])
         ret = ret.sum(dim=2)
         ret /= lens
         ret[ret!=ret] = 0.0
