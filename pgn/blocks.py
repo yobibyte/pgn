@@ -50,7 +50,7 @@ class NodeBlock(Block):
                                 idx = [g.incoming_edges(nid, vt, at, ids_only=True) for nid in range(g.num_vertices(vt))]
                                 flat = [item for sublist in idx for item in sublist]
                                 agg_input.append(edata[g_idx][at][flat].split([len(el) for el in idx]))
-                        in_aggregated.append(self._in_e2n_aggregators[at](agg_input))
+                        in_aggregated.append(self._in_e2n_aggregators[at](agg_input, fsize=edata[0][at].shape[-1]))
 
                 out_aggregated = []
                 if self._out_e2n_aggregators is not None:
@@ -62,7 +62,7 @@ class NodeBlock(Block):
                                        range(g.num_vertices(vt))]
                                 flat = [item for sublist in idx for item in sublist]
                                 out_agg_input.append(edata[g_idx][at][flat].split([len(el) for el in idx]))
-                        out_aggregated.append(self._out_e2n_aggregators[at](agg_input))
+                        out_aggregated.append(self._out_e2n_aggregators[at](agg_input, fsize=edata[0][at].shape[-1]))
 
                 aggregated = torch.cat(in_aggregated + out_aggregated, dim=2)
 
@@ -114,7 +114,6 @@ class EdgeBlock(Block):
                 if Gs[0].num_vertex_types == 1:
                     vtype = einfo[0][0].receiver.type
 
-                    #megavertexdata = torch.stack([el[vtype] for el in vdata])
                     sender_ids = np.array([[einfo[el_id][e].sender.id for e in range(el)] for el_id, el in enumerate(n_edges)])
                     receiver_ids = np.array([[einfo[el_id][e].sender.id for e in range(el)] for el_id, el in enumerate(n_edges)])
 
@@ -179,9 +178,9 @@ class GlobalBlock(Block):
             else:
                 uin = []
                 for vt, agg in self._vertex_aggregators.items():
-                    uin.append(agg([[g.vertex_data(vt)] for g in Gs]))
+                    uin.append(agg([[g.vertex_data(vt)] for g in Gs], fsize=Gs[0].vertex_data(vt).shape[-1]))
                 for et, agg in self._edge_aggregators.items():
-                    uin.append(agg([[g.edge_data(et)] for g in Gs]))
+                    uin.append(agg([[g.edge_data(et)] for g in Gs], fsize=Gs[0].edge_data(et).shape[-1]))
                 tin = torch.cat((tin, *uin), dim=2)
                 tout = self._updaters[t](tin)
                 for el_idx, el in enumerate(tout):
