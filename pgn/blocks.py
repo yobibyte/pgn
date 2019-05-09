@@ -20,7 +20,7 @@ class NodeBlock(Block):
         super().__init__(in_e2n_aggregators is None and out_e2n_aggregators is None)
         self._updaters = nn.ModuleDict(updaters)
         self._in_e2n_aggregators = in_e2n_aggregators
-        self._out_e2n_aggregators = out_e2n_aggregators
+        #self._out_e2n_aggregators = out_e2n_aggregators
 
     def forward(self, Gs):
         if isinstance(Gs, pg.Graph):
@@ -52,19 +52,20 @@ class NodeBlock(Block):
                                 agg_input.append(edata[g_idx][at][flat].split([len(el) for el in idx]))
                         in_aggregated.append(self._in_e2n_aggregators[at](agg_input, fsize=edata[0][at].shape[-1]))
 
-                out_aggregated = []
-                if self._out_e2n_aggregators is not None:
-                    for at in self._out_e2n_aggregators:
-                        out_agg_input = []
-                        for g_idx, g in enumerate(Gs):
-                            if self._out_e2n_aggregators is not None:
-                                idx = [g.outgoing_edges(nid, vt, at, ids_only= True) for nid in
-                                       range(g.num_vertices(vt))]
-                                flat = [item for sublist in idx for item in sublist]
-                                out_agg_input.append(edata[g_idx][at][flat].split([len(el) for el in idx]))
-                        out_aggregated.append(self._out_e2n_aggregators[at](agg_input, fsize=edata[0][at].shape[-1]))
+                # out_aggregated = []
+                # if self._out_e2n_aggregators is not None:
+                #     for at in self._out_e2n_aggregators:
+                #         out_agg_input = []
+                #         for g_idx, g in enumerate(Gs):
+                #             if self._out_e2n_aggregators is not None:
+                #                 idx = [g.outgoing_edges(nid, vt, at, ids_only= True) for nid in
+                #                        range(g.num_vertices(vt))]
+                #                 flat = [item for sublist in idx for item in sublist]
+                #                 out_agg_input.append(edata[g_idx][at][flat].split([len(el) for el in idx]))
+                #         out_aggregated.append(self._out_e2n_aggregators[at](agg_input, fsize=edata[0][at].shape[-1]))
 
-                aggregated = torch.cat(in_aggregated + out_aggregated, dim=2)
+                #aggregated = torch.cat(in_aggregated + out_aggregated, dim=2)
+                aggregated = in_aggregated
 
                 # output for all the graphs
                 if cdata is not None:

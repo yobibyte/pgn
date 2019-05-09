@@ -16,6 +16,7 @@ from pgn.graph import Vertex, DirectedEdge, Context, DirectedGraphWithContext
 from pgn.models import EncoderCoreDecoder
 from pgn.utils import pgn2nx, plot_graph
 
+torch.set_num_threads(4)
 
 def graph_data_from_list(input_list):
     """
