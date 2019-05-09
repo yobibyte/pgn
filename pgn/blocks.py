@@ -115,7 +115,7 @@ class EdgeBlock(Block):
                     vtype = einfo[0][0].receiver.type
 
                     sender_ids = np.array([[einfo[el_id][e].sender.id for e in range(el)] for el_id, el in enumerate(n_edges)])
-                    receiver_ids = np.array([[einfo[el_id][e].sender.id for e in range(el)] for el_id, el in enumerate(n_edges)])
+                    receiver_ids = np.array([[einfo[el_id][e].receiver.id for e in range(el)] for el_id, el in enumerate(n_edges)])
 
                     sender_data = []
                     receiver_data = []
