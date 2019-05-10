@@ -156,6 +156,13 @@ class GlobalBlock(Block):
         out = [{} for _ in range(len(Gs))]
         cdata = [g.context_data() for g in Gs]
 
+        if not self._independent:
+            uin = []
+            for vt, agg in self._vertex_aggregators.items():
+                uin.append(agg([[g.vertex_data(vt)] for g in Gs], fsize=Gs[0].vertex_data(vt).shape[-1]))
+            for et, agg in self._edge_aggregators.items():
+                uin.append(agg([[g.edge_data(et)] for g in Gs], fsize=Gs[0].edge_data(et).shape[-1]))
+
         for t in cdata[0]:
             tin = torch.stack([el[t] for el in cdata])
             if self._independent:
@@ -163,11 +170,6 @@ class GlobalBlock(Block):
                 for el_idx, el in enumerate(tout):
                     out[el_idx][t] = el
             else:
-                uin = []
-                for vt, agg in self._vertex_aggregators.items():
-                    uin.append(agg([[g.vertex_data(vt)] for g in Gs], fsize=Gs[0].vertex_data(vt).shape[-1]))
-                for et, agg in self._edge_aggregators.items():
-                    uin.append(agg([[g.edge_data(et)] for g in Gs], fsize=Gs[0].edge_data(et).shape[-1]))
                 tin = torch.cat((tin, *uin), dim=2)
                 tout = self._updaters[t](tin)
                 for el_idx, el in enumerate(tout):

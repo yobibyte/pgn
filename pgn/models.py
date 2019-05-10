@@ -118,4 +118,4 @@ class EncoderCoreDecoder(nn.Module):
             self.decoder.train()
 
         return outs
-    
+
