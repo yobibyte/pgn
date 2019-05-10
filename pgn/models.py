@@ -110,7 +110,7 @@ class EncoderCoreDecoder(nn.Module):
             self.core.eval()
             self.decoder.eval()
 
-        outs = self.forward(input_graphs, output_all_steps=True)
+        outs = self(input_graphs, output_all_steps=True)
 
         if not compute_grad:
             self.encoder.train()

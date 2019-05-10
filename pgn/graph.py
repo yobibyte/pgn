@@ -25,17 +25,22 @@ class Context(Entity):
         super().__init__(id, type, hidden_info=hidden_info)
 
 class Graph(object):
-    pass
+    def __init__(self):
+        '''Metadata stores any information (in tensors) we might use to help with using the output of the graph net. For instance, valid actions vectors.'''
+        self._metadata = {}
 
 class DirectedGraph(Graph):
     def __init__(self, entities, safemode=False):
-
+        super().__init__()
         # entities is a dict, where the key stands for the entity type,
         # and the value is the dict with the 'data' and 'info' which has a list of all the entities where their index
         # in the array corresponds to the index in the fist dimension of the data tensor
         # [{'data': tf.Tensor, 'info': []}, ]
         self._vertices = {k: v.copy() for k, v in entities['vertex'].items()}
         self._edges = {k: v.copy() for k, v in entities['edge'].items()}
+
+        if 'metadata' in entities:
+            self._metadata = entities['medatada'].copy() # not a deep copy and I mean it
 
         if safemode:
             self.safety_check()
