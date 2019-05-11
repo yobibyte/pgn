@@ -40,7 +40,7 @@ class DirectedGraph(Graph):
         self._edges = {k: v.copy() for k, v in entities['edge'].items()}
 
         if 'metadata' in entities:
-            self._metadata = entities['medatada'].copy() # not a deep copy and I mean it
+            self._metadata = entities['metadata'].copy() # not a deep copy and I mean it
 
         if safemode:
             self.safety_check()
