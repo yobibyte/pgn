@@ -98,9 +98,7 @@ def batch_loss(outs, targets, criterion):
             loss += sum([criterion(g['edge']['edge']['data'], t['edge']) for g, t in zip(out, targets)])
         return loss
 
-
-if __name__ == '__main__':
-
+def run():
     parser = argparse.ArgumentParser(description='Sorting with graph networks')
     parser.add_argument('--num-train', type=int, default=32, help='number of training examples')
     parser.add_argument('--num-eval', type=int, default=32, help='number of evaluation examples')
@@ -172,20 +170,24 @@ if __name__ == '__main__':
         end_time = time.time()
         if args.verbose:
             print('Epoch {} is done. {:.2f} sec spent.'.format(e, end_time - st_time))
+
         if e % args.eval_freq == 0 or e == args.epochs - 1:
             eval_outs = model.process_batch(eval_input, compute_grad=False)
             eval_loss = batch_loss(eval_outs, eval_target, criterion)
             print("Epoch %d, mean training loss: %f, mean evaluation loss: %f."
                   % (e, train_loss.item() / args.num_train, eval_loss.item() / args.num_train))
-
+    
     unsorted = np.random.uniform(size=args.sample_length)
     test_g = graph_data_from_list(unsorted)
+    
+    if args.cuda and torch.cuda.is_available():
+        test_g['vertex']['data'] = test_g['vertex']['data'].to('cuda')
+        test_g['edge']['data'] = test_g['edge']['data'].to('cuda')
+        test_g['context']['data'] = test_g['context']['data'].to('cuda')
+    
     test_g['vertex'] = {'vertex': test_g['vertex']}
     test_g['edge'] = {'edge': test_g['edge']}
     test_g['context'] = {'context': test_g['context']}
-
-    if args.cuda and torch.cuda.is_available():
-        test_g.to('cuda')
 
     g = model.forward([test_g])[0]
     g = DirectedGraphWithContext(g)
@@ -198,3 +200,6 @@ if __name__ == '__main__':
     plt.matshow(mx[sort_indices][:, sort_indices], cmap="viridis")
     plt.grid(False)
     plt.savefig('pgn_sorting_output.png')
+
+if __name__ == '__main__':
+    run()
