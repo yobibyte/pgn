@@ -98,7 +98,7 @@ class EncoderCoreDecoder(nn.Module):
             latents_data = self.core(concatenated)
 
             if output_all_steps or s + 1 == self._core_steps:
-                outputs.append(self.decoder(latents))
+                outputs.append(self.decoder([self._input_type(d) for d in latents_data]))
 
         if not output_all_steps:
             return outputs[-1]
