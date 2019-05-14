@@ -221,6 +221,11 @@ class IndependentGraphNetwork(nn.Module):
     def forward(self, Gs):
         # make one pass as in the original paper
         # 1. Compute updated edge attributes
+
+        edge_outs = None
+        v_outs = None
+        g_outs = None
+
         if self._edge_block is not None:
             edge_outs = self._edge_block(Gs)
 
