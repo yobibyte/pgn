@@ -207,3 +207,38 @@ class GraphNetwork(nn.Module):
             for i, G in enumerate(Gs):
                 G.set_context_data(g_outs[i])
         return [G.get_entities() for G in Gs]
+
+
+class IndependentGraphNetwork(nn.Module):
+    def __init__(self, node_block=None, edge_block=None, global_block=None):
+        super().__init__()
+        self._node_block = node_block
+        self._edge_block = edge_block
+        self._global_block = global_block
+
+    def forward(self, Gs):
+        # make one pass as in the original paper
+        # 1. Compute updated edge attributes
+        if self._edge_block is not None:
+            edge_outs = self._edge_block(Gs)
+
+        # 2. Aggregate edge attributes per node
+        # 3. Compute updated node attributes
+        if self._node_block is not None:
+            v_outs = self._node_block(Gs)
+
+        if self._global_block is not None:
+            # 4. Aggregate edge attributes globally
+            # 5. Aggregate node attributes globally
+            # 6. Compute updated global attribute
+            g_outs = self._global_block(Gs)
+
+        for i, G in enumerate(Gs):
+            if edge_outs is not None:
+                G.set_edge_data(edge_outs[i])
+            if v_outs is not None:
+                G.set_vertex_data(v_outs[i])
+            if g_outs is not None:
+                G.set_context_data(g_outs[i])
+
+        return [G.get_entities() for G in Gs]

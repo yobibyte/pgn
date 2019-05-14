@@ -1,7 +1,7 @@
 import torch.nn as nn
 
 from pgn.aggregators import MeanAggregator
-from pgn.blocks import NodeBlock, EdgeBlock, GlobalBlock, GraphNetwork
+from pgn.blocks import NodeBlock, EdgeBlock, GlobalBlock, GraphNetwork, IndependentGraphNetwork
 import pgn.graph as pg
 
 def get_mlp(input_size, units, activation=nn.ReLU):
@@ -52,7 +52,7 @@ class EncoderCoreDecoder(nn.Module):
                                                                                   *enc_global_shape,
                                                                                   independent=True)
 
-        self.encoder = GraphNetwork(NodeBlock({'vertex': enc_node_updater}),
+        self.encoder = IndependentGraphNetwork(NodeBlock({'vertex': enc_node_updater}),
                                     EdgeBlock({'edge': enc_edge_updater}, independent=True),
                                     GlobalBlock({'context': enc_global_updater}) if enc_global_updater else None)
 
@@ -70,7 +70,7 @@ class EncoderCoreDecoder(nn.Module):
                                                                                   *dec_edge_shape,
                                                                                   *dec_global_shape,
                                                                                   independent=True)
-        self.decoder = GraphNetwork(
+        self.decoder = IndependentGraphNetwork(
             NodeBlock({'vertex': nn.Sequential(dec_node_updater, nn.Linear(dec_vertex_shape[-1], out_vertex_size))}),
             EdgeBlock({'edge': nn.Sequential(dec_edge_updater, nn.Linear(dec_edge_shape[-1], out_edge_size))},
                       independent=True),
