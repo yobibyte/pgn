@@ -43,15 +43,18 @@ class NodeBlock(Block):
                 in_aggregated = []
                 if self._in_e2n_aggregators is not None:
                     for at in self._in_e2n_aggregators:
+                        einfo = [g.edge_info(at) for g in Gs]
                         agg_input = []
                         for g_idx, g in enumerate(Gs):
                             if self._in_e2n_aggregators is not None:
-                                idx = [g.incoming_edges(nid, vt, at, ids_only=True) for nid in range(g.num_vertices(vt))]
-                                flat = [item for sublist in idx for item in sublist]
-                                agg_input.append(edata[g_idx][at][flat].split([len(el) for el in idx]))
-                        in_aggregated.append(self._in_e2n_aggregators[at](agg_input, fsize=edata[0][at].shape[-1]))
+                                idx = torch.LongTensor([el.receiver.id for el in einfo[g_idx]])
+                                #idx = [g.incoming_edges(nid, vt, at, ids_only=True) for nid in range(g.num_vertices(vt))]
+                                #flat = [item for sublist in idx for item in sublist]
+                                #agg_input.append(edata[g_idx][at][flat].split([len(el) for el in idx]))
+                            #in_aggregated.append(self._in_e2n_aggregators[at](agg_input, fsize=edata[0][at].shape[-1]))
+                                in_aggregated.append(self._in_e2n_aggregators[at](edata[g_idx][at], idx))
 
-                aggregated = torch.cat((in_aggregated), dim=2)
+                aggregated = torch.stack(in_aggregated)
 
                 # output for all the graphs
                 if cdata is not None:
@@ -159,10 +162,9 @@ class GlobalBlock(Block):
         if not self._independent:
             uin = []
             for vt, agg in self._vertex_aggregators.items():
-                uin.append(agg([[g.vertex_data(vt)] for g in Gs], fsize=Gs[0].vertex_data(vt).shape[-1]))
+                uin.append(torch.stack([agg(g.vertex_data(vt), torch.LongTensor([0]*g.vertex_data(vt).shape[0])) for g in Gs]))
             for et, agg in self._edge_aggregators.items():
-                uin.append(agg([[g.edge_data(et)] for g in Gs], fsize=Gs[0].edge_data(et).shape[-1]))
-
+                uin.append(torch.stack([agg(g.edge_data(et), torch.LongTensor([0]*g.edge_data(et).shape[0])) for g in Gs]))
         for t in cdata[0]:
             tin = torch.stack([el[t] for el in cdata])
             if self._independent:
