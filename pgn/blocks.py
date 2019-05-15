@@ -161,7 +161,7 @@ class GlobalBlock(Block):
         if not self._independent:
             uin = []
             for vt, agg in self._vertex_aggregators.items():
-                uin.append(torch.stack([agg(g.vertex_data(vt), torch.tensor([0]*g.vertex_data(vt).shape[0], device=g.rertex_data(vt).device)) for g in Gs]))
+                uin.append(torch.stack([agg(g.vertex_data(vt), torch.tensor([0]*g.vertex_data(vt).shape[0], device=g.vertex_data(vt).device)) for g in Gs]))
             for et, agg in self._edge_aggregators.items():
                 uin.append(torch.stack([agg(g.edge_data(et), torch.tensor([0]*g.edge_data(et).shape[0], device=g.edge_data(et).device)) for g in Gs]))
         for t in cdata[0]:

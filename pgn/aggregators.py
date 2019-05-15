@@ -42,8 +42,6 @@ class MeanAggregator(Aggregator):
         # ret = ret.sum(dim=2)/lens
         #ret[ret.detach()!=ret.detach()] = 0.0
 
-        # 0th dim is graph
-        # 1st dim is entity id
-        # 2st dim is num of entities to aggregate
-        # 3st is their feature dim
+        # 0st dim is entity id
+        # 1st is their feature dim
         return scatter_mean(X, indices, dim=0, dim_size=dim_size)
