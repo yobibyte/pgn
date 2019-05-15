@@ -24,7 +24,7 @@ class Aggregator(nn.Module):
 
 
 class MeanAggregator(Aggregator):
-    def forward(self, X, indices):
+    def forward(self, X, indices, dim_size=None):
         # We can't simply batch this since the sublists can be of unequal length.
         # We either need to do this in a for loop or pad in a smart way
         # (simple padding will affect the average results, for instance).
@@ -46,4 +46,4 @@ class MeanAggregator(Aggregator):
         # 1st dim is entity id
         # 2st dim is num of entities to aggregate
         # 3st is their feature dim
-        return scatter_mean(X, indices, dim=0)
+        return scatter_mean(X, indices, dim=0, dim_size=dim_size)

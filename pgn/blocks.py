@@ -40,21 +40,19 @@ class NodeBlock(Block):
             for vt in vdata[0]:
                 # TODO we can move aggregation outside of this loop and aggregate for all of the vertices first, and just access it further
 
-                in_aggregated = []
+                aggregated = []
                 if self._in_e2n_aggregators is not None:
                     for at in self._in_e2n_aggregators:
+                        in_aggregated = []
                         einfo = [g.edge_info(at) for g in Gs]
                         agg_input = []
                         for g_idx, g in enumerate(Gs):
                             if self._in_e2n_aggregators is not None:
-                                idx = torch.LongTensor([el.receiver.id for el in einfo[g_idx]])
-                                #idx = [g.incoming_edges(nid, vt, at, ids_only=True) for nid in range(g.num_vertices(vt))]
-                                #flat = [item for sublist in idx for item in sublist]
-                                #agg_input.append(edata[g_idx][at][flat].split([len(el) for el in idx]))
-                            #in_aggregated.append(self._in_e2n_aggregators[at](agg_input, fsize=edata[0][at].shape[-1]))
-                                in_aggregated.append(self._in_e2n_aggregators[at](edata[g_idx][at], idx))
+                                idx = torch.tensor([el.receiver.id for el in einfo[g_idx]], device=edata[g_idx][at].device)
+                                in_aggregated.append(self._in_e2n_aggregators[at](edata[g_idx][at], idx, dim_size=g.num_vertices(vt)))
+                        aggregated.append(torch.stack(in_aggregated))
 
-                aggregated = torch.stack(in_aggregated)
+                aggregated = torch.cat(aggregated, dim=2)
 
                 # output for all the graphs
                 if cdata is not None:
@@ -62,6 +60,7 @@ class NodeBlock(Block):
                     curr_cdata = torch.stack(curr_cdata)
                     vtin = torch.cat((aggregated, torch.stack([el[vt] for el in vdata]), curr_cdata), dim=2)
                 else:
+                    stacked_vdata = torch.stack([el[vt] for el in vdata])
                     vtin = torch.cat((aggregated, torch.stack([el[vt] for el in vdata])), dim=2)
 
                 vtout = self._updaters[vt](vtin)
@@ -162,9 +161,9 @@ class GlobalBlock(Block):
         if not self._independent:
             uin = []
             for vt, agg in self._vertex_aggregators.items():
-                uin.append(torch.stack([agg(g.vertex_data(vt), torch.LongTensor([0]*g.vertex_data(vt).shape[0])) for g in Gs]))
+                uin.append(torch.stack([agg(g.vertex_data(vt), torch.tensor([0]*g.vertex_data(vt).shape[0], device=g.rertex_data(vt).device)) for g in Gs]))
             for et, agg in self._edge_aggregators.items():
-                uin.append(torch.stack([agg(g.edge_data(et), torch.LongTensor([0]*g.edge_data(et).shape[0])) for g in Gs]))
+                uin.append(torch.stack([agg(g.edge_data(et), torch.tensor([0]*g.edge_data(et).shape[0], device=g.edge_data(et).device)) for g in Gs]))
         for t in cdata[0]:
             tin = torch.stack([el[t] for el in cdata])
             if self._independent:
