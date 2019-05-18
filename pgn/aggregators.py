@@ -25,23 +25,6 @@ class Aggregator(nn.Module):
 
 class MeanAggregator(Aggregator):
     def forward(self, X, indices, dim_size=None):
-        # We can't simply batch this since the sublists can be of unequal length.
-        # We either need to do this in a for loop or pad in a smart way
-        # (simple padding will affect the average results, for instance).
-        # TODO this thinks, that all graphs in a batch have the same topology
-        # flatten X
-        #gsize = len(X)
-        #vsize = len(X[0])
-
-        # lens = []
-        # for g in X:
-        #     lens.append([[el.shape[0]] for el in g])
-        # lens = torch.tensor(lens, device=g[0].device, dtype=torch.float).detach()
-        # X = [el for sl in X for el in sl]
-        # ret = pad_sequence(X, batch_first=True).view(gsize, vsize, -1, fsize)
-        # ret = ret.sum(dim=2)/lens
-        #ret[ret.detach()!=ret.detach()] = 0.0
-
         # 0st dim is entity id
         # 1st is their feature dim
         return scatter_mean(X, indices, dim=0, dim_size=dim_size)
