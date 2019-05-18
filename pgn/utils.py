@@ -35,8 +35,8 @@ def pgn2nx(ig):
     for t, einfo in ig.edge_info().items():
         for e in einfo:
             colour = 'black' if e.type not in EDGE_COLOURS else EDGE_COLOURS[e.type]
-            label = str(e.id) if e.hidden_info is None or 'label' not in e.hidden_info else 'e.id: {},\n'.format(v.id) + str(e.hidden_info) + ' ' + str(ig.edge_data(t)[e.id])
-            G.add_edge((e.sender.type, e.sender.id), (e.receiver.type, e.receiver.id), color=colour, label=label)
+            basic_info = 'id: {}, data: {}'.format(e.id, ig.edge_data(t)[e.id])
+            G.add_edge((e.sender.type, e.sender.id), (e.receiver.type, e.receiver.id), color=colour, label=basic_info)
     pos = nx.spring_layout(G)
 
     for n in G.node:
