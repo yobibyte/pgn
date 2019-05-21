@@ -1,27 +1,78 @@
+import numpy as np
 import pgn.graph as pg
-
 import torch
 import torch.nn as nn
-import numpy as np
+
 
 class Block(nn.Module):
+    """A building block of my graph network kingdom.
+
+    A block is a bundle of an updater and a bunch of aggregators to prepare data for the updater. Updater is the king.
+    Each entity type has its own bundle. Updater takes the aggregated information from all of the types,
+    but updates only its own.
+    """
+
     def __init__(self, independent):
+        """
+
+        Parameters
+        ----------
+        independent: bool
+            If the block is independent, the network takes only the particular entity tensor and updates it.
+            No other entities data tensors affected.
+            G' gets its data updated after all the blocks has finished their job.
+        """
         super().__init__()
         self._independent = independent
         self._params_registered = False
 
     @property
     def independent(self):
+        """Is the block independent?"""
+
         return self._independent
 
 
 class NodeBlock(Block):
-    def __init__(self, updaters=None, in_e2n_aggregators=None, out_e2n_aggregators=None):
+    """Node block"""
+
+    def __init__(self, updaters=None, in_e2n_aggregators=None):
+        """
+
+        Parameters
+        ----------
+        updaters: dict
+            dict of updaters, key is the data type to update, value is the updater itself
+        in_e2n_aggregators:
+            dict of aggregators, key is the data type, value is the pgn.aggregators.Aggregator object.
+
+        There were outgoing edge aggregators here before
+        (they also appeared at the DeepMind implementation at some point).
+        When I did my 'need for speed' profiling, I decided to get rid of them for
+        now and mirror an outgoing edge with an incoming one. This turned out to be faster for me.
+        But I do not have any empirical evidence for which approach is better for some particular problem.
+
+        """
         super().__init__(in_e2n_aggregators is None)
-        self._updaters = nn.ModuleDict(updaters)
+        self._updaters = nn.ModuleDict(updaters)  # this is needed to correctly register model parameters
         self._in_e2n_aggregators = in_e2n_aggregators
 
     def forward(self, Gs):
+        """ make a forward pass for node entities
+
+        Updaters work in a batched mode (take all the data tensor and feed to the updater),
+        aggregators do their job in a for loop, one aggregator call per graph.
+
+        Parameters
+        ----------
+        Gs: pgn.graph.Graph or list of them
+            input data
+
+        Returns
+        -------
+            list of dicts with data tensors
+        """
+
         if isinstance(Gs, pg.Graph):
             Gs = [Gs]
         out = [{} for _ in range(len(Gs))]
@@ -35,7 +86,8 @@ class NodeBlock(Block):
                     out[el_idx][vt] = el
         else:
             edata = [g.edge_data() for g in Gs]
-            cdata = [g.context_data(concat=True) for g in Gs] if isinstance(Gs[0], pg.DirectedGraphWithContext) else None
+            cdata = [g.context_data(concat=True) for g in Gs] if isinstance(Gs[0],
+                                                                            pg.DirectedGraphWithContext) else None
 
             for vt in vdata[0]:
                 # TODO we can move aggregation outside of this loop and aggregate for all of the vertices first, and just access it further
@@ -45,11 +97,12 @@ class NodeBlock(Block):
                     for at in self._in_e2n_aggregators:
                         in_aggregated = []
                         einfo = [g.edge_info(at) for g in Gs]
-                        agg_input = []
                         for g_idx, g in enumerate(Gs):
                             if self._in_e2n_aggregators is not None:
-                                idx = torch.tensor([el.receiver.id for el in einfo[g_idx]], device=edata[g_idx][at].device)
-                                in_aggregated.append(self._in_e2n_aggregators[at](edata[g_idx][at], idx, dim_size=g.num_vertices(vt)))
+                                idx = torch.tensor([el.receiver.id for el in einfo[g_idx]],
+                                                   device=edata[g_idx][at].device)
+                                in_aggregated.append(
+                                    self._in_e2n_aggregators[at](edata[g_idx][at], idx, dim_size=g.num_vertices(vt)))
                         aggregated.append(torch.stack(in_aggregated))
 
                 aggregated = torch.cat(aggregated, dim=2)
@@ -60,7 +113,6 @@ class NodeBlock(Block):
                     curr_cdata = torch.stack(curr_cdata)
                     vtin = torch.cat((aggregated, torch.stack([el[vt] for el in vdata]), curr_cdata), dim=2)
                 else:
-                    stacked_vdata = torch.stack([el[vt] for el in vdata])
                     vtin = torch.cat((aggregated, torch.stack([el[vt] for el in vdata])), dim=2)
 
                 vtout = self._updaters[vt](vtin)
@@ -71,13 +123,42 @@ class NodeBlock(Block):
 
 
 class EdgeBlock(Block):
+    """Edge block, nothing much to say"""
+
     def __init__(self, updaters=None, independent=False):
+        """
+
+        Parameters
+        ----------
+        updaters: dict
+            one updater per type
+        independent: bool
+            independent or not
+        """
         super().__init__(independent)
-        self._updaters = nn.ModuleDict(updaters)
+        self._updaters = nn.ModuleDict(updaters)  # this is needed to correctly register model parameters
 
     def forward(self, Gs):
-        # I assume that graphs are homogenious here, i.e. they have the same types of entities,
-        # but that makes sense since the model depends on the graph entities types
+        """ make a forward pass for node entities
+
+        Updaters work in a batched mode (take all the data tensor and feed to the updater),
+        aggregators do their job in a for loop, one aggregator call per graph.
+
+        scatter operations (in the aggregators) were of great help for me and let me get rid of a lot
+        of splits which slowed down the backward step a LOT.
+
+        I assume that graphs are homogeneous here, i.e. they have the same types of entities,
+        but that makes sense since the model depends on the graph entities types
+
+        Parameters
+        ----------
+        Gs: pgn.graph.Graph or list of them
+            input data
+
+        Returns
+        -------
+            list of dicts with data tensors
+        """
 
         if isinstance(Gs, pg.Graph):
             Gs = [Gs]
@@ -103,15 +184,17 @@ class EdgeBlock(Block):
                 if Gs[0].num_vertex_types == 1:
                     vtype = einfo[0][0].receiver.type
 
-                    sender_ids = np.array([[einfo[el_id][e].sender.id for e in range(el)] for el_id, el in enumerate(n_edges)])
-                    receiver_ids = np.array([[einfo[el_id][e].receiver.id for e in range(el)] for el_id, el in enumerate(n_edges)])
+                    sender_ids = np.array(
+                        [[einfo[el_id][e].sender.id for e in range(el)] for el_id, el in enumerate(n_edges)])
+                    receiver_ids = np.array(
+                        [[einfo[el_id][e].receiver.id for e in range(el)] for el_id, el in enumerate(n_edges)])
 
                     sender_data = []
                     receiver_data = []
                     for el_id, el in enumerate(sender_ids):
-                          sender_data.append(vdata[el_id][vtype][el])
+                        sender_data.append(vdata[el_id][vtype][el])
                     for el_id, el in enumerate(receiver_ids):
-                          receiver_data.append(vdata[el_id][vtype][el])
+                        receiver_data.append(vdata[el_id][vtype][el])
                     sender_data = torch.stack(sender_data)
                     receiver_data = torch.stack(receiver_data)
                 else:
@@ -139,7 +222,25 @@ class EdgeBlock(Block):
 
 
 class GlobalBlock(Block):
+    """Context block
+
+    #TODO rename this to context
+    """
+
     def __init__(self, updaters=None, vertex_aggregators=None, edge_aggregators=None):
+        """
+
+        Parameters
+        ----------
+        updaters: dict
+            one updater per type {type1: updater, type2: updater}
+        vertex_aggregators: dict
+            one aggregator per type, if an aggregator is absent for a type, it will not be aggregated
+        edge_aggregators: dict
+            one aggregator per type, if an aggregator is absent for a type, it will not be aggregated
+
+        """
+
         super().__init__(vertex_aggregators is None or edge_aggregators is None)
 
         if (vertex_aggregators is None != edge_aggregators):
@@ -152,6 +253,25 @@ class GlobalBlock(Block):
         # TODO Implement outgoing aggregators for the release
 
     def forward(self, Gs):
+        """ make a forward pass for node entities
+
+        Updaters work in a batched mode (take all the data tensor and feed to the updater),
+        aggregators do their job in a for loop, one aggregator call per graph.
+
+        scatter operations (in the aggregators) were of great help for me and let me get rid of a lot
+        of splits which slowed down the backward step a LOT.
+
+        Parameters
+        ----------
+        Gs: pgn.graph.Graph or list of them
+            input data
+
+        Returns
+        -------
+            list of dicts with data tensors
+        """
+
+
         if isinstance(Gs, pg.Graph):
             Gs = [Gs]
 
@@ -161,9 +281,13 @@ class GlobalBlock(Block):
         if not self._independent:
             uin = []
             for vt, agg in self._vertex_aggregators.items():
-                uin.append(torch.stack([agg(g.vertex_data(vt), torch.tensor([0]*g.vertex_data(vt).shape[0], device=g.vertex_data(vt).device)) for g in Gs]))
+                uin.append(torch.stack([agg(g.vertex_data(vt), torch.tensor([0] * g.vertex_data(vt).shape[0],
+                                                                            device=g.vertex_data(vt).device)) for g in
+                                        Gs]))
             for et, agg in self._edge_aggregators.items():
-                uin.append(torch.stack([agg(g.edge_data(et), torch.tensor([0]*g.edge_data(et).shape[0], device=g.edge_data(et).device)) for g in Gs]))
+                uin.append(torch.stack(
+                    [agg(g.edge_data(et), torch.tensor([0] * g.edge_data(et).shape[0], device=g.edge_data(et).device))
+                     for g in Gs]))
         for t in cdata[0]:
             tin = torch.stack([el[t] for el in cdata])
             if self._independent:
@@ -176,9 +300,11 @@ class GlobalBlock(Block):
                 for el_idx, el in enumerate(tout):
                     out[el_idx][t] = el
         return out
-    
+
 
 class GraphNetwork(nn.Module):
+    """A default Graph Network as defined in Battaglia et al., 2018"""
+
     def __init__(self, node_block=None, edge_block=None, global_block=None):
         super().__init__()
         self._node_block = node_block
@@ -211,6 +337,9 @@ class GraphNetwork(nn.Module):
 
 
 class IndependentGraphNetwork(nn.Module):
+    """An independent graph network, where each updater updates its own entity/type only,
+    and all the G' data are update after all of the blocks finish their job"""
+
     def __init__(self, node_block=None, edge_block=None, global_block=None):
         super().__init__()
         self._node_block = node_block

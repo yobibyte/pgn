@@ -1,15 +1,19 @@
+import cProfile
+import time
+
 import networkx as nx
 import torch
 from networkx.drawing.nx_agraph import to_agraph
 from pgn.graph import DirectedEdge, DirectedGraph, Vertex
-import cProfile
-import time
 
+# TODO this, probably, should go to the pymarl code
 EDGE_COLOURS = {'edge': 'black', 'action': 'black', 'relation': 'orange'}
-LAYOUTS = ['neato', 'dot', 'twopi', 'circo', 'fdp', 'sfdp']
+LAYOUTS = ['neato', 'dot', 'twopi', 'circo', 'fdp', 'sfdp']  # layouts that worked on my machine
 
 
 def generate_graph():
+    """Method to generate a simple graph for testing purposes"""
+
     vinfo = [Vertex(id=i) for i in range(2)]
     vertices = {'data': torch.Tensor([[0], [1]]), 'info': vinfo}
 
@@ -24,12 +28,26 @@ def generate_graph():
 
 
 def pgn2nx(ig):
+    """
+
+    Parameters
+    ----------
+    ig: dict
+        A dictionary of entities
+
+    Returns
+    -------
+    G: nx.MultiDiGraph
+        A graph converted to the format networkx can plot.
+    """
+
     ig = DirectedGraph(ig)
     G = nx.MultiDiGraph()
     for t, vinfo in ig.vertex_info().items():
         for v in vinfo:
             colour = 'black' if v.hidden_info is None or 'colour' not in v.hidden_info else v.hidden_info['colour']
-            label = str(v.id) if v.hidden_info is None or 'label' not in v.hidden_info else 'v.id: {},\n'.format(v.id) + str(v.hidden_info) + ' ' + str(ig.vertex_data(t)[v.id])
+            label = str(v.id) if v.hidden_info is None or 'label' not in v.hidden_info else 'v.id: {},\n'.format(
+                v.id) + str(v.hidden_info) + ' ' + str(ig.vertex_data(t)[v.id])
             G.add_node((v.type, v.id), color=colour, label=label)
 
     for t, einfo in ig.edge_info().items():
@@ -45,23 +63,51 @@ def pgn2nx(ig):
 
 
 def plot_graph(g, fname='graph.pdf'):
-    # based on https://stackoverflow.com/a/49386888/1768248
+    """Plot a networkx directed multigraph
 
-    # add graphviz layout options (see https://stackoverflow.com/a/39662097)
+    This was not easy to do at all. Plotting directed multigraphs neatly in python is an UNSOLVED problem.
+
+    * based on https://stackoverflow.com/a/49386888/1768248
+    * adding attributes to edges in multigraphs is more complicated but see
+        https://stackoverflow.com/a/26694158
+    * add graphviz layout options (see https://stackoverflow.com/a/39662097)
+
+    Parameters
+    ----------
+    g
+    fname
+
+    Returns
+    -------
+
+    """
+
     g.graph['edge'] = {'arrowsize': '0.6', 'splines': 'curved'}
     g.graph['node'] = {'shape': 'box'}
     g.graph['graph'] = {'scale': '1'}
 
-    # adding attributes to edges in multigraphs is more complicated but see
-    # https://stackoverflow.com/a/26694158
-
     a = to_agraph(g)
-    a.layout('circo')
+    a.layout('circo')  # circo was the friendliest layout for me
     a.draw(fname)
 
 
 def profileit(name):
-    # https://stackoverflow.com/a/5376616
+    """Profiling decorator
+
+    Add @profileit('your_name') for a function to run cprof on it
+    Based on https://stackoverflow.com/a/5376616
+
+    Parameters
+    ----------
+    name: str
+        name of the file to save profiling results to
+
+    Returns
+    -------
+
+    """
+
+    #
     def inner(func):
         def wrapper(*args, **kwargs):
             prof = cProfile.Profile()
@@ -69,19 +115,40 @@ def profileit(name):
             # Note use of name from outer scope
             prof.dump_stats(name)
             return retval
+
         return wrapper
+
     return inner
 
+
 def timeit(name):
+    """Timing decorator
+
+    Add @timeit('name') to time execution of the function.
+    Built in the same way as profileit above.
+
+    Parameters
+    ----------
+    name: str
+        Name to see in the output.
+
+    Returns
+    -------
+
+    """
+
     def inner(func):
         def wrapper(*args, **kwargs):
             ts = time.time()
             result = func(*args, **kwargs)
             te = time.time()
-            print('%s, took: %2.4f sec' % (name, te-ts))
+            print('%s, took: %2.4f sec' % (name, te - ts))
             return result
+
         return wrapper
+
     return inner
+
 
 if __name__ == '__main__':
     g = generate_graph()

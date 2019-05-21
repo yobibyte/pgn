@@ -5,7 +5,6 @@ Original tf implementation here: https://github.com/deepmind/graph_nets/blob/mas
 
 import argparse
 import itertools
-
 import time
 
 import matplotlib.pyplot as plt
@@ -18,17 +17,19 @@ from pgn.utils import pgn2nx, plot_graph
 
 torch.set_num_threads(4)
 
+
 def graph_data_from_list(input_list):
-    """
-    Takes a list with the data, generates a fully connected graph with values of the list as nodes
+    """Takes a list with the data, generates a fully connected graph with values of the list as nodes
+
     Parameters
     ----------
     input_list: list
-    List with the data
+        list of the numbers to sort
 
     Returns
     -------
-    pgn.Graph with the input_list values as nodes
+    graph_data: dict
+        Dict of entities for the list provided.
     """
     connectivity = [el for el in itertools.product(range(len(input_list)), repeat=2)]
     vertices = [Vertex(i) for i in range(len(input_list))]
@@ -36,14 +37,29 @@ def graph_data_from_list(input_list):
     graph_data = {'vertex': {'data': torch.Tensor([[v] for v in input_list]), 'info': vertices},
                   'edge': {'data': torch.zeros(len(connectivity), 1),
                            'info': [DirectedEdge(i, vertices[connectivity[i][0]], vertices[connectivity[i][1]]) for i in
-                                range(len(connectivity))]},
+                                    range(len(connectivity))]},
                   'context': {'data': torch.Tensor([[0]]), 'info': [Context(0)]}
                   }
     add_connectivity(graph_data)
     return graph_data
 
-def edge_id_by_sender_and_receiver(metadata, sid, rid):
 
+def edge_id_by_sender_and_receiver(metadata, sid, rid):
+    """Get edge id from the information about its sender and its receiver.
+
+    Parameters
+    ----------
+    metadata: list
+        list of pgn.graph.Edge objects
+    sid: int
+        sender id
+    rid: int
+        receiver id
+
+    Returns
+    -------
+
+    """
     if sid > len(metadata) - 1 or rid > len(metadata) - 1:
         return -1
 
@@ -53,12 +69,26 @@ def edge_id_by_sender_and_receiver(metadata, sid, rid):
 
     return -1
 
+
 def create_target_data(input_data):
+    """ Generate target data for training
+
+    Parameters
+    ----------
+    input_data: list
+        list of data to sort
+
+    Returns
+    -------
+    res: dict
+        dict of target graph entities
+    """
     # two nodes might have true since they might have similar values
     min_val = input_data['vertex']['data'].min()
 
     # [prob_true, prob_false]
-    target_vertex_data = torch.Tensor([[1.0, 0.0] if v == min_val else [0.0, 1.0] for v in input_data['vertex']['data']])
+    target_vertex_data = torch.Tensor(
+        [[1.0, 0.0] if v == min_val else [0.0, 1.0] for v in input_data['vertex']['data']])
 
     sorted_ids = input_data['vertex']['data'].argsort(dim=0).flatten()
     target_edge_data = torch.zeros(input_data['edge']['data'].shape[0], 2)
@@ -75,30 +105,77 @@ def create_target_data(input_data):
     return {'vertex': target_vertex_data,
             'edge': target_edge_data}
 
+
 def add_connectivity(entities):
+    """Add the information about incoming/outgoing edges for the graph vertices.
+
+    Parameters
+    ----------
+    entities: dict
+        dict of graph entities
+
+    Returns
+    -------
+    entities: dict
+        updated dict of graph entities
+
+    """
+
     for v in entities['vertex']['info']:
         incoming = {'edge': [e for e in entities['edge']['info'] if e.receiver.id == v.id]}
         outgoing = {'edge': [e for e in entities['edge']['info'] if e.sender.id == v.id]}
         v.incoming_edges = incoming
         v.outgoing_edges = outgoing
 
-def generate_graph_batch(n_examples, sample_length, target=True):
-    input_data = [graph_data_from_list(np.random.uniform(size=sample_length)) for _ in range(n_examples)]
-    if not target:
-        return input_data
 
+def generate_graph_batch(n_examples, sample_length):
+    """ generate all of the training data
+
+    Parameters
+    ----------
+    n_examples: int
+        Num of the samples
+    sample_length: int
+        Length of the samples.
+        # TODO we should implement samples of different lens as in the DeepMind example.
+    Returns
+    -------
+    res: tuple
+        (input_data, target_data), each of the elements is a list of entities dicts
+    """
+
+    input_data = [graph_data_from_list(np.random.uniform(size=sample_length)) for _ in range(n_examples)]
     target_data = [create_target_data(g) for g in input_data]
+
     return input_data, target_data
 
 
 def batch_loss(outs, targets, criterion):
-        loss = 0
-        for out in outs:
-            loss += sum([criterion(g['vertex']['vertex']['data'], t['vertex']) for g, t in zip(out, targets)])
-            loss += sum([criterion(g['edge']['edge']['data'], t['edge']) for g, t in zip(out, targets)])
-        return loss
+    """get the loss for the network outputs
+
+    Parameters
+    ----------
+    outs: list
+        list of lists of the graph network output, time is 0-th dimension, batch is 1-th dimension
+    targets: list
+        list of the graph entities for the expected output
+    criterion: torch._Loss object
+        loss to use
+    Returns
+    -------
+    loss: float
+        Shows how good your mode is.
+    """
+    loss = 0
+    for out in outs:
+        loss += sum([criterion(g['vertex']['vertex']['data'], t['vertex']) for g, t in zip(out, targets)])
+        loss += sum([criterion(g['edge']['edge']['data'], t['edge']) for g, t in zip(out, targets)])
+    return loss
+
 
 def run():
+    """Run an experiment and plot the results on a randomly sampled example not seen during training."""
+
     parser = argparse.ArgumentParser(description='Sorting with graph networks')
     parser.add_argument('--num-train', type=int, default=32, help='number of training examples')
     parser.add_argument('--num-eval', type=int, default=32, help='number of evaluation examples')
@@ -133,7 +210,7 @@ def run():
     if args.plot_graph_sample:
         ng = pgn2nx(train_input[0])
         plot_graph(ng, fname='input_graph.pdf')
-    
+
     if args.cuda and torch.cuda.is_available():
         for el in train_input + eval_input:
             for d in el.values():
@@ -153,7 +230,6 @@ def run():
         el['edge'] = {'edge': el['edge']}
         if 'context' in el:
             el['context'] = {'context': el['context']}
-
 
     optimiser = torch.optim.Adam(lr=0.001, params=model.parameters())
     criterion = nn.BCEWithLogitsLoss()
@@ -176,15 +252,15 @@ def run():
             eval_loss = batch_loss(eval_outs, eval_target, criterion)
             print("Epoch %d, mean training loss: %f, mean evaluation loss: %f."
                   % (e, train_loss.item() / args.num_train, eval_loss.item() / args.num_train))
-    
+
     unsorted = np.random.uniform(size=args.sample_length)
     test_g = graph_data_from_list(unsorted)
-    
+
     if args.cuda and torch.cuda.is_available():
         test_g['vertex']['data'] = test_g['vertex']['data'].to('cuda')
         test_g['edge']['data'] = test_g['edge']['data'].to('cuda')
         test_g['context']['data'] = test_g['context']['data'].to('cuda')
-    
+
     test_g['vertex'] = {'vertex': test_g['vertex']}
     test_g['edge'] = {'edge': test_g['edge']}
     test_g['context'] = {'context': test_g['context']}
@@ -200,6 +276,7 @@ def run():
     plt.matshow(mx[sort_indices][:, sort_indices], cmap="viridis")
     plt.grid(False)
     plt.savefig('pgn_sorting_output.png')
+
 
 if __name__ == '__main__':
     run()
