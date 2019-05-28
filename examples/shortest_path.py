@@ -30,11 +30,6 @@ def add_connectivity(entities):
     entities: dict
         dict of graph entities
 
-    Returns
-    -------
-    entities: dict
-        updated dict of graph entities
-
     """
 
     for v in entities['vertex']['vertex']['info']:
@@ -44,7 +39,12 @@ def add_connectivity(entities):
         v.outgoing_edges = outgoing
 
 def networkx_to_digraph(graph):
-    """"Converts a networkx graph to a torch graph"""
+    """"Converts a networkx graph to a torch graph
+
+        Parameters
+        ----------
+        graph: nx.Graph
+    """
     connectivity = [edge for edge in graph.edges()]
     vertices = [Vertex(i) for i in range(graph.number_of_nodes())]
     edges = [DirectedEdge(i, vertices[connectivity[i][0]], vertices[connectivity[i][1]]) for i in
@@ -59,6 +59,18 @@ def networkx_to_digraph(graph):
     return entities
 
 def generate_graph_batch(num_examples, theta, num_nodes_min_max):
+    """"Generates a batch of graphs
+
+        Parameters
+        ----------
+        num_examples: int
+            number of graphs to generate
+        theta: float
+            a threshold parameter for generating
+        num_nodes_min_max: (int, int)
+            a tuple bounding the minimum and maximum number of nodes in the graph
+
+    """
     input_graphs, target_graphs, _ = generate_networkx_graphs(
         rand, num_examples, num_nodes_min_max, theta)
     input_data = [networkx_to_digraph(graph) for graph in input_graphs]
