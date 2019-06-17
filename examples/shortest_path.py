@@ -99,6 +99,9 @@ def batch_loss(outs, targets, criterion):
         loss += sum([criterion(g['edge']['edge']['data'], t['edge']['edge']['data']) for g, t in zip(out, targets)])
     return loss
 
+def accuracy(outs, targets):
+    print(outs)
+    print(targets)
 def run():
     """Run an experiment"""
     parser = argparse.ArgumentParser(description='Finding the shortest path in a graph with graph networks')
