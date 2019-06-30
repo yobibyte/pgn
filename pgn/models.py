@@ -4,7 +4,7 @@ from pgn.aggregators import MeanAggregator
 from pgn.blocks import NodeBlock, EdgeBlock, GlobalBlock, GraphNetwork, IndependentGraphNetwork
 
 
-def get_mlp(input_size, units, activation=nn.ReLU):
+def get_mlp(input_size, units, activation=nn.ReLU, layer_norm=True):
     """Helper to build multilayer perceptrons
 
     Important! Last layer is activated as well! And there is a LayerNorm after.
@@ -29,7 +29,8 @@ def get_mlp(input_size, units, activation=nn.ReLU):
         arch.append(nn.Linear(inpt_size, l))
         arch.append(activation())
         inpt_size = l
-    arch.append(nn.LayerNorm(inpt_size))
+    if layer_norm:
+        arch.append(nn.LayerNorm(inpt_size))
     return nn.Sequential(*arch)
 
 
