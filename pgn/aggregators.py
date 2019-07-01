@@ -1,5 +1,6 @@
 import torch.nn as nn
 from torch_scatter import scatter_mean
+import torch
 
 """Module to keep all the aggregation functions
 
@@ -53,3 +54,27 @@ class MeanAggregator(Aggregator):
         """
 
         return scatter_mean(x, indices, dim=0, dim_size=dim_size)
+
+class NonScatterMeanAggregator(Aggregator):
+    """Average along the 0-th dimension (per entity)"""
+
+    def forward(self, x, dim=0):
+        """
+
+        Parameters
+        ----------
+        x: torch.Tensor
+        indices: torch.LongTensor
+        dim_size: How many elements should be in the output?
+        We need that in case if an entity has not items to aggregate.
+        Without it, the indices will be messed up.
+
+        0-th dimension is entity id, e.g. edge id
+        1-st dimension is the feature dim
+
+        Returns
+        -------
+
+        """
+
+        return torch.mean(x, dim=dim, keepdim=True)

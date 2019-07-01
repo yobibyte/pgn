@@ -34,7 +34,7 @@ def graph_data_from_list(input_list):
     connectivity = [el for el in itertools.product(range(len(input_list)), repeat=2)]
     vertices = [Vertex(i) for i in range(len(input_list))]
 
-    graph_data = {'vertex': {'data': torch.Tensor([[v] for v in input_list]), 'info': vertices},
+    graph_data = {'vertex': {'data': torch.tensor([[v] for v in input_list]), 'info': vertices},
                   'edge': {'data': torch.zeros(len(connectivity), 1),
                            'info': [DirectedEdge(i, vertices[connectivity[i][0]], vertices[connectivity[i][1]]) for i in
                                     range(len(connectivity))]},

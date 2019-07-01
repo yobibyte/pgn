@@ -1,6 +1,6 @@
 import pgn.graph as pg
 import torch.nn as nn
-from pgn.aggregators import MeanAggregator
+from pgn.aggregators import MeanAggregator, NonScatterMeanAggregator
 from pgn.blocks import NodeBlock, EdgeBlock, GlobalBlock, GraphNetwork, IndependentGraphNetwork
 
 
@@ -156,8 +156,8 @@ class EncoderCoreDecoder(nn.Module):
 
         self.core = GraphNetwork(NodeBlock({'vertex': core_node_updater}, {'edge': MeanAggregator()}),
                                  EdgeBlock({'edge': core_edge_updater}),
-                                 GlobalBlock({'context': core_global_updater}, {'vertex': MeanAggregator()},
-                                             {'edge': MeanAggregator()}) if core_global_updater else None)
+                                 GlobalBlock({'context': core_global_updater}, {'vertex': NonScatterMeanAggregator()},
+                                             {'edge': NonScatterMeanAggregator()}) if core_global_updater else None)
 
         dec_node_updater, dec_edge_updater, dec_global_updater = get_mlp_updaters(*dec_vertex_shape,
                                                                                   *dec_edge_shape,
