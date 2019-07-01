@@ -215,8 +215,6 @@ class EncoderCoreDecoder(nn.Module):
             return outputs[-1]
         return outputs
 
-    from yobitools.profiling import profileit
-    @profileit('process_batch.prof')
     def process_batch(self, input_graphs, compute_grad=True):
         """This used to do batching which is moved to the GraphNetwork now. We have only eval->train mode here now"""
         # TODO this should probably go away
