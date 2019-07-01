@@ -181,9 +181,9 @@ class EdgeBlock(Block):
 
                 if Gs[0].num_vertex_types == 1:
                     sender_ids = torch.tensor(
-                        [g._sender_ids[et] for g in Gs], requires_grad=False).unsqueeze(-1).expand(-1,-1, *vdata.shape[2:])
+                        [g._sender_ids[et] for g in Gs], requires_grad=False).unsqueeze(-1).expand(-1,-1, *vdata.shape[2:], device=vdata.device)
                     receiver_ids = torch.tensor(
-                        [g._receiver_ids[et] for g in Gs], requires_grad=False).unsqueeze(-1).expand(-1,-1, *vdata.shape[2:])
+                        [g._receiver_ids[et] for g in Gs], requires_grad=False).unsqueeze(-1).expand(-1,-1, *vdata.shape[2:], device=vdata.device)
                     sender_data = vdata.gather(1, sender_ids)
                     receiver_data = vdata.gather(1, receiver_ids)
                 else:
