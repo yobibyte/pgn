@@ -215,21 +215,19 @@ class EncoderCoreDecoder(nn.Module):
             return outputs[-1]
         return outputs
 
+    from yobitools.profiling import profileit
+    @profileit('process_batch.prof')
     def process_batch(self, input_graphs, compute_grad=True):
         """This used to do batching which is moved to the GraphNetwork now. We have only eval->train mode here now"""
         # TODO this should probably go away
         # I think, just doing model.eval() from outside is enough
 
         if not compute_grad:
-            self.encoder.eval()
-            self.core.eval()
-            self.decoder.eval()
+            self.eval()
 
         outs = self(input_graphs, output_all_steps=True)
 
         if not compute_grad:
-            self.encoder.train()
-            self.core.train()
-            self.decoder.train()
+            self.train()
 
         return outs

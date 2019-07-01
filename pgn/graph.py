@@ -118,6 +118,18 @@ class DirectedGraph(Graph):
         self._vertices = {k: v.copy() for k, v in entities['vertex'].items()}
         self._edges = {k: v.copy() for k, v in entities['edge'].items()}
 
+
+        if 'sender_ids' not in entities:
+            self._sender_ids = {k: [el.sender.id for el in self.edge_info(k)] for k,v in self._edges.items()}
+            entities['sender_ids'] = self._sender_ids
+        else:
+            self._sender_ids = entities['sender_ids']
+        if 'receiver_ids' not in entities:
+            self._receiver_ids = {k: [el.receiver.id for el in self.edge_info(k)] for k,v in self._edges.items()}
+            entities['receiver_ids'] = self._receiver_ids
+        else:
+            self._receiver_ids = entities['receiver_ids']
+
         if 'metadata' in entities:
             self._metadata = entities['metadata'].copy()  # not a deep copy and I mean it
 

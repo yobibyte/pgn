@@ -171,32 +171,21 @@ class EdgeBlock(Block):
                 for el_idx, el in enumerate(gout):
                     out[el_idx][et] = el
         else:
-            vdata = [g.vertex_data() for g in Gs]
+            vdata = torch.stack([g.vertex_data(g.default_vertex_type) for g in Gs])
             cdata = [g.context_data(concat=True) for g in Gs] if isinstance(Gs[0],
                                                                             pg.DirectedGraphWithContext) else None
 
             for et in Gs[0].edge_data():
 
-                n_edges = [g.num_edges(et) for g in Gs]
-                einfo = [g.edge_info(et) for g in Gs]
                 edata = torch.stack([g.edge_data(et) for g in Gs])
 
                 if Gs[0].num_vertex_types == 1:
-                    vtype = einfo[0][0].receiver.type
-
-                    sender_ids = np.array(
-                        [[einfo[el_id][e].sender.id for e in range(el)] for el_id, el in enumerate(n_edges)])
-                    receiver_ids = np.array(
-                        [[einfo[el_id][e].receiver.id for e in range(el)] for el_id, el in enumerate(n_edges)])
-
-                    sender_data = []
-                    receiver_data = []
-                    for el_id, el in enumerate(sender_ids):
-                        sender_data.append(vdata[el_id][vtype][el])
-                    for el_id, el in enumerate(receiver_ids):
-                        receiver_data.append(vdata[el_id][vtype][el])
-                    sender_data = torch.stack(sender_data)
-                    receiver_data = torch.stack(receiver_data)
+                    sender_ids = torch.tensor(
+                        [g._sender_ids[et] for g in Gs], requires_grad=False).unsqueeze(-1).expand(-1,-1, *vdata.shape[2:])
+                    receiver_ids = torch.tensor(
+                        [g._receiver_ids[et] for g in Gs], requires_grad=False).unsqueeze(-1).expand(-1,-1, *vdata.shape[2:])
+                    sender_data = vdata.gather(1, sender_ids)
+                    receiver_data = vdata.gather(1, receiver_ids)
                 else:
                     pass
                     # TODO torch concat along axis 0? or 1?
