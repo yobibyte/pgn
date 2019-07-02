@@ -6,7 +6,8 @@ Original tf implementation here: https://github.com/deepmind/graph_nets/blob/mas
 import argparse
 import itertools
 import time
-
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
