@@ -2,7 +2,8 @@ import pgn.graph as pg
 import torch.nn as nn
 from pgn.aggregators import MeanAggregator, NonScatterMeanAggregator
 from pgn.blocks import NodeBlock, EdgeBlock, GlobalBlock, GraphNetwork, IndependentGraphNetwork
-
+import torch
+from pgn.utils import concat_entities
 
 def get_mlp(input_size, units, activation=nn.ReLU, layer_norm=True):
     """Helper to build multilayer perceptrons
@@ -196,16 +197,11 @@ class EncoderCoreDecoder(nn.Module):
 
         latents_data = [el for el in latents0_data]
         outputs = []
-        concat_topo = None
 
         for s in range(self._core_steps):
-            latents0 = [self._input_type(d) for d in latents0_data]
-            latents = [self._input_type(d) for d in latents_data]
-
-            if concat_topo is None:
-                concat_topo = [lg.get_graph_with_same_topology() for lg in latents0]
-
-            concatenated = [l0.__class__.concat([l0, l], ct) for l0, l, ct in zip(latents0, latents, concat_topo)]
+            concatenated = []
+            for l0, l in zip(latents0_data, latents_data):
+                concatenated.append(self._input_type(concat_entities([l0,l], latents0_data[0].items())))
             latents_data = self.core(concatenated)
 
             if output_all_steps or s + 1 == self._core_steps:

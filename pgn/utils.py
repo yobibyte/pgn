@@ -87,6 +87,15 @@ def plot_graph(g, fname='graph.pdf'):
     a.layout('circo')  # circo was the friendliest layout for me
     a.draw(fname)
 
+
+def concat_entities(entities, template):
+    res = {k: {et: {} for et in v} for k, v in template}
+    for et, ed in res.items():
+        for est in ed:
+            res[et][est]['data'] = torch.cat([el[et][est]['data'] for el in entities], dim=1)
+            res[et][est]['info'] = entities[0][et][est]['info']
+    return res
+
 if __name__ == '__main__':
     g = generate_graph()
     ng = pgn2nx(g)

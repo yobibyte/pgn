@@ -75,7 +75,7 @@ class NodeBlock(Block):
 
         if isinstance(Gs, pg.Graph):
             Gs = [Gs]
-        out = [{} for _ in range(len(Gs))]
+        out = [{}]*len(Gs)
         vdata = [g.vertex_data() for g in Gs]
 
         if self._independent:
@@ -257,7 +257,7 @@ class GlobalBlock(Block):
         if isinstance(Gs, pg.Graph):
             Gs = [Gs]
 
-        out = [{} for _ in range(len(Gs))]
+        out = [{}]*len(Gs)
         cdata = [g.context_data() for g in Gs]
 
         if not self._independent:

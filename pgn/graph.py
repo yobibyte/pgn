@@ -536,10 +536,10 @@ class DirectedGraph(Graph):
         assert all([el.__class__ == cls for el in graph_list])
 
         if len(graph_list) == 0:
-            raise ValueError("Nothing to concatenate. Give me some graphs, man!")
+            raise ValueError("Nothing to concatenate. Give me some graphs!")
 
         if len(graph_list) == 1:
-            return graph_list[0]
+            return topology.set
 
         # TODO check that topology is the same for everyone
         # TODO it's wasteful to copy zeros every type, just get the stub for the data with Nones
@@ -632,6 +632,7 @@ class DirectedGraphWithContext(DirectedGraph):
 
         return self._context
 
+
     @classmethod
     def concat(cls, graph_list, topology=None):
         """Concate the graphs. Same as with parent class, but concats contexts as well."""
@@ -641,7 +642,7 @@ class DirectedGraphWithContext(DirectedGraph):
         assert all([el.__class__ == cls for el in graph_list])
 
         if len(graph_list) == 0:
-            raise ValueError("Nothing to concatenate. Give me some graphs, man!")
+            raise ValueError("Nothing to concatenate. Give me some graphs!")
 
         if len(graph_list) == 1:
             return graph_list[0]
