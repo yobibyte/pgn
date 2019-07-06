@@ -96,13 +96,12 @@ class NodeBlock(Block):
                 if self._in_e2n_aggregators is not None:
                     for at in self._in_e2n_aggregators:
                         in_aggregated = []
-                        einfo = [g.edge_info(at) for g in Gs]
+                        receiver_ids = torch.tensor(
+                            [g._receiver_ids[at] for g in Gs], requires_grad=False, device=edata[0][at].device)
                         for g_idx, g in enumerate(Gs):
                             if self._in_e2n_aggregators is not None:
-                                idx = torch.tensor([el.receiver.id for el in einfo[g_idx]],
-                                                   device=edata[g_idx][at].device)
                                 in_aggregated.append(
-                                    self._in_e2n_aggregators[at](edata[g_idx][at], idx, dim_size=g.num_vertices(vt)))
+                                    self._in_e2n_aggregators[at](edata[g_idx][at], receiver_ids[g_idx], dim_size=g.num_vertices(vt)))
                         aggregated.append(torch.stack(in_aggregated))
 
                 aggregated = torch.cat(aggregated, dim=2)
