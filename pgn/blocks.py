@@ -187,14 +187,7 @@ class EdgeBlock(Block):
                     sender_data = vdata.gather(1, sender_ids)
                     receiver_data = vdata.gather(1, receiver_ids)
                 else:
-                    pass
-                    # TODO torch concat along axis 0? or 1?
-                    # TODO pad till largest here
-                    raise NotImplementedError
-                    # receiver_data = torch.stack(
-                    #     [vertex_data[einfo[e].receiver.type][einfo[e].receiver.id] for e in range(n_edges)])
-                    # sender_data = torch.stack([vertex_data[einfo[e].sender.type][einfo[e].sender.id] for e in
-                    #                              range(n_edges)])
+                    raise NotImplementedError("Current implementation supports one vertex type only")
 
                 if cdata is not None:
                     curr_cdata = [el.repeat(edata[el_id].shape[0], 1) for el_id, el in enumerate(cdata)]
