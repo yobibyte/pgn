@@ -539,7 +539,7 @@ class DirectedGraph(Graph):
             raise ValueError("Nothing to concatenate. Give me some graphs!")
 
         if len(graph_list) == 1:
-            return topology.set
+            return graph_list[0]
 
         # TODO check that topology is the same for everyone
         # TODO it's wasteful to copy zeros every type, just get the stub for the data with Nones
