@@ -3,7 +3,6 @@ import pgn.graph as pg
 import torch
 import torch.nn as nn
 
-
 class Block(nn.Module):
     """A building block of my graph network kingdom.
 
@@ -88,23 +87,22 @@ class NodeBlock(Block):
             edata = [g.edge_data() for g in Gs]
             cdata = [g.context_data(concat=True) for g in Gs] if isinstance(Gs[0],
                                                                             pg.DirectedGraphWithContext) else None
-
             for vt in vdata[0]:
                 # TODO we can move aggregation outside of this loop and aggregate for all of the vertices first, and just access it further
 
                 aggregated = []
                 if self._in_e2n_aggregators is not None:
                     for at in self._in_e2n_aggregators:
+                        stacked_edata = torch.stack([el[at] for el in edata])
+
                         in_aggregated = []
                         receiver_ids = torch.tensor(
-                            [g._receiver_ids[at] for g in Gs], requires_grad=False, device=edata[0][at].device)
-                        for g_idx, g in enumerate(Gs):
-                            if self._in_e2n_aggregators is not None:
-                                in_aggregated.append(
-                                    self._in_e2n_aggregators[at](edata[g_idx][at], receiver_ids[g_idx], dim_size=g.num_vertices(vt)))
-                        aggregated.append(torch.stack(in_aggregated))
+                            [g._receiver_ids[at] for g in Gs], requires_grad=False, device=edata[0][at].device).unsqueeze(-1).expand(-1,-1, *stacked_edata.shape[2:],)
+                        in_aggregated.append(
+                            self._in_e2n_aggregators[at](stacked_edata, receiver_ids, dim_size=vdata[0][vt].shape[0], dim=1))
+                    aggregated.append(torch.stack(in_aggregated))
 
-                aggregated = torch.cat(aggregated, dim=2)
+                aggregated = torch.cat(aggregated, dim=1).squeeze(0)
 
                 # output for all the graphs
                 if cdata is not None:

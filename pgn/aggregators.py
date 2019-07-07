@@ -34,7 +34,7 @@ class Aggregator(nn.Module):
 class MeanAggregator(Aggregator):
     """Average along the 0-th dimension (per entity)"""
 
-    def forward(self, x, indices, dim_size=None):
+    def forward(self, x, indices, dim_size=None, dim=0):
         """
 
         Parameters
@@ -53,7 +53,7 @@ class MeanAggregator(Aggregator):
 
         """
 
-        return scatter_mean(x, indices, dim=0, dim_size=dim_size)
+        return scatter_mean(x, indices, dim=dim, dim_size=dim_size)
 
 class NonScatterMeanAggregator(Aggregator):
     """Average along the 0-th dimension (per entity)"""

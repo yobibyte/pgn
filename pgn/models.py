@@ -5,6 +5,7 @@ from pgn.blocks import NodeBlock, EdgeBlock, GlobalBlock, GraphNetwork, Independ
 import torch
 from pgn.utils import concat_entities
 
+
 def get_mlp(input_size, units, activation=nn.ReLU, layer_norm=True):
     """Helper to build multilayer perceptrons
 
