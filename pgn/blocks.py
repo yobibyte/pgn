@@ -99,7 +99,7 @@ class NodeBlock(Block):
                         agg = self._in_e2n_aggregators[at](stacked_edata, receiver_ids, dim_size=vdata[0][vt].shape[0], dim=1)
                         aggregated.append(agg)
 
-                aggregated = torch.cat(aggregated, dim=1).squeeze(0)
+                aggregated = torch.cat(aggregated, dim=2)
 
                 # output for all the graphs
                 if cdata is not None:
