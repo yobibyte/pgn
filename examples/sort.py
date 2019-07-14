@@ -175,25 +175,32 @@ def run():
         ng = pgn2nx(train_input[0])
         plot_graph(ng, fname='input_graph.pdf')
 
-    if args.cuda and torch.cuda.is_available():
-        for el in train_input + eval_input:
-            for i in range(3):
-                el[i] = el[i].to('cuda')
-        for el in train_target + eval_target:
-            for i in range(3):
-                el[i] = el[i].to('cuda')
-        model.to('cuda')
 
 
     optimiser = torch.optim.Adam(lr=0.001, params=model.parameters())
     criterion = nn.BCEWithLogitsLoss()
 
-    train_input = batch_data(train_input)
+    train_input = list(batch_data(train_input))
 
-    train_target = (torch.cat([el[0] for el in train_target]), torch.cat([el[1] for el in train_target]))
-    eval_target = (torch.cat([el[0] for el in eval_target]), torch.cat([el[1] for el in eval_target]))
+    train_target = [torch.cat([el[0] for el in train_target]), torch.cat([el[1] for el in train_target])]
+    eval_target = [torch.cat([el[0] for el in eval_target]), torch.cat([el[1] for el in eval_target])]
 
-    eval_input = batch_data(eval_input)
+    eval_input = list(batch_data(eval_input))
+    
+    if args.cuda and torch.cuda.is_available():
+         
+        train_input[0] = train_input[0].to('cuda')
+        for k in train_input[1]:
+            train_input[1][k] = train_input[1][k].to('cuda')
+            train_input[2][k] = train_input[2][k].to('cuda')
+        train_input[3] = train_input[3].to('cuda')
+
+        train_target[0] = train_target[0].to('cuda')
+        train_target[1] = train_target[1].to('cuda')
+        eval_target[0] = eval_target[0].to('cuda')
+        eval_target[1] = eval_target[1].to('cuda')
+    
+        model.to('cuda')
 
     for e in range(args.epochs):
         st_time = time.time()
