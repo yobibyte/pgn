@@ -237,7 +237,7 @@ def run():
     unsorted = np.random.uniform(size=args.sample_length)
     test_g = graph_data_from_list(unsorted)
 
-    test_g = batch_data([test_g])
+    test_g = list(batch_data([test_g]))
     if args.cuda and torch.cuda.is_available():
         for i,el in enumerate(test_g):
             test_g[i] = el.cuda()
