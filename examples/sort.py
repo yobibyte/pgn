@@ -219,7 +219,7 @@ def run():
         st_time = time.time()
 
         train_outs = model(*train_input, output_all_steps=True)
-        train_loss = batch_loss(train_outs, train_target, criterion)
+        train_loss = batch_loss(train_outs, train_target, criterion, args.num_train)
         optimiser.zero_grad()
         train_loss.backward()
         optimiser.step()
@@ -231,9 +231,9 @@ def run():
         if e % args.eval_freq == 0 or e == args.epochs - 1:
             model.eval()
             eval_outs = model(*eval_input, output_all_steps=True)
-            eval_loss = batch_loss(eval_outs, eval_target, criterion)
+            eval_loss = batch_loss(eval_outs, eval_target, criterion, args.num_eval)
             print("Epoch %d, mean training loss: %f, mean evaluation loss: %f."
-                  % (e, train_loss.item() / args.num_train, eval_loss.item() / args.num_train))
+                  % (e, train_loss.item() / args.num_train, eval_loss.item() / args.num_eval))
             model.train()
 
     unsorted = np.random.uniform(size=args.sample_length)
