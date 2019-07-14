@@ -114,7 +114,7 @@ def generate_graph_batch(n_examples, sample_length):
     return input_data, target_data
 
 
-def batch_loss(outs, targets, criterion):
+def batch_loss(outs, targets, criterion, batch_size=32):
     """get the loss for the network outputs
 
     Parameters
@@ -132,8 +132,10 @@ def batch_loss(outs, targets, criterion):
     """
     loss = 0
     for out in outs:
-        loss+=criterion(out[0], targets[0])
-        loss+=criterion(out[1]['default'], targets[1])
+        for i in range(out[0].shape[0]//batch_size):
+            loss+=criterion(out[0][i*batch_size:(i+1)*batch_size], targets[0][i*batch_size:(i+1)*batch_size])
+        for i in range(out[1]['default'].shape[0] // batch_size):
+            loss+=criterion(out[1]['default'][i*batch_size:(i+1)*batch_size], targets[1][i*batch_size:(i+1)*batch_size])
     return loss
 
 
