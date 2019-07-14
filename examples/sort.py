@@ -155,6 +155,11 @@ def run():
     train_input, train_target = generate_graph_batch(args.num_train, sample_length=args.sample_length)
     eval_input, eval_target = generate_graph_batch(args.num_train, sample_length=args.sample_length)
 
+    device = torch.device('cpu')
+    if args.cuda and torch.cuda.is_available():
+        device = torch.device('cuda')
+
+
     model = EncoderCoreDecoder(args.core_steps,
                                enc_vertex_shape=(1, 16),
                                core_vertex_shape=(32, 16),
@@ -168,7 +173,7 @@ def run():
                                core_global_shape=(32, 16),
                                dec_global_shape=(16, 16),
                                out_global_size=2,
-                               )
+                               device=device)
 
     # plot one of the input graphs
     if args.plot_graph_sample:
@@ -194,6 +199,12 @@ def run():
             train_input[1][k] = train_input[1][k].to('cuda')
             train_input[2][k] = train_input[2][k].to('cuda')
         train_input[3] = train_input[3].to('cuda')
+
+        eval_input[0] = eval_input[0].to('cuda')
+        for k in eval_input[1]:
+            eval_input[1][k] = eval_input[1][k].to('cuda')
+            eval_input[2][k] = eval_input[2][k].to('cuda')
+        eval_input[3] = eval_input[3].to('cuda')
 
         train_target[0] = train_target[0].to('cuda')
         train_target[1] = train_target[1].to('cuda')

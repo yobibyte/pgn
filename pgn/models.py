@@ -97,7 +97,8 @@ class EncoderCoreDecoder(nn.Module):
                  enc_edge_shape, core_edge_shape, dec_edge_shape, out_edge_size,
                  enc_global_shape=(None, None), core_global_shape=(None, None), dec_global_shape=(None, None),
                  out_global_size=None,
-                 input_type=pg.DirectedGraphWithContext):
+                 input_type=pg.DirectedGraphWithContext,
+                 device=torch.device('cpu')):
         """
         TODO this should be made easier for the user. It is very easy to mess up the shape and spend half a day on
         figuring out why you need +10 neurons here or there. The first thing we should do, probably is to make user
@@ -138,6 +139,7 @@ class EncoderCoreDecoder(nn.Module):
         """
 
         super().__init__()
+        self._device = device
         self._input_type = input_type
 
         self._core_steps = core_steps
@@ -146,9 +148,9 @@ class EncoderCoreDecoder(nn.Module):
                                                                                   *enc_global_shape,
                                                                                   independent=True)
 
-        self.encoder = IndependentGraphNetwork(NodeBlock(enc_node_updater),
-                                               EdgeBlock({'default': enc_edge_updater}, independent=True),
-                                               GlobalBlock(enc_global_updater) if enc_global_updater else None)
+        self.encoder = IndependentGraphNetwork(NodeBlock(enc_node_updater, device=device),
+                                               EdgeBlock({'default': enc_edge_updater}, independent=True, device=device),
+                                               GlobalBlock(enc_global_updater, device=device) if enc_global_updater else None)
 
 
         core_node_updater, core_edge_updater, core_global_updater = get_mlp_updaters(*core_vertex_shape,
@@ -156,21 +158,21 @@ class EncoderCoreDecoder(nn.Module):
                                                                                      *core_global_shape,
                                                                                      independent=False)
 
-        self.core = GraphNetwork(NodeBlock(core_node_updater, {'default': MeanAggregator()}),
-                                 EdgeBlock({'default': core_edge_updater}),
+        self.core = GraphNetwork(NodeBlock(core_node_updater, {'default': MeanAggregator()}, device=device),
+                                 EdgeBlock({'default': core_edge_updater}, device=device),
                                  GlobalBlock(core_global_updater, MeanAggregator(),
-                                             {'default': MeanAggregator()}) if core_global_updater else None)
+                                             {'default': MeanAggregator()}, device=device) if core_global_updater else None)
 
         dec_node_updater, dec_edge_updater, dec_global_updater = get_mlp_updaters(*dec_vertex_shape,
                                                                                   *dec_edge_shape,
                                                                                   *dec_global_shape,
                                                                                   independent=True)
         self.decoder = IndependentGraphNetwork(
-            NodeBlock(nn.Sequential(dec_node_updater, nn.Linear(dec_vertex_shape[-1], out_vertex_size))),
+            NodeBlock(nn.Sequential(dec_node_updater, nn.Linear(dec_vertex_shape[-1], out_vertex_size)), device=device),
             EdgeBlock({'default': nn.Sequential(dec_edge_updater, nn.Linear(dec_edge_shape[-1], out_edge_size))},
-                      independent=True),
+                      independent=True, device=device),
             GlobalBlock(nn.Sequential(dec_global_updater, nn.Linear(dec_global_shape[-1],
-                                                                                out_global_size))) if dec_global_updater else None,
+                                                                                out_global_size)), device=device) if dec_global_updater else None,
         )
 
     def forward(self, vdata, edata, connectivity, cdata, metadata, output_all_steps=False):

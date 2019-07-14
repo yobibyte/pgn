@@ -11,7 +11,7 @@ class Block(nn.Module):
     but updates only its own.
     """
 
-    def __init__(self, independent):
+    def __init__(self, independent, device):
         """
 
         Parameters
@@ -24,6 +24,7 @@ class Block(nn.Module):
         super().__init__()
         self._independent = independent
         self._params_registered = False
+        self._device = device
 
     @property
     def independent(self):
@@ -35,7 +36,7 @@ class Block(nn.Module):
 class NodeBlock(Block):
     """Node block"""
 
-    def __init__(self, updater, in_e2n_aggregators={}):
+    def __init__(self, updater, in_e2n_aggregators={}, device=torch.device('cpu')):
         """
 
         Parameters
@@ -52,7 +53,7 @@ class NodeBlock(Block):
         But I do not have any empirical evidence for which approach is better for some particular problem.
 
         """
-        super().__init__(in_e2n_aggregators == {})
+        super().__init__(in_e2n_aggregators == {}, device=device)
         self._updater = updater  # this is needed to correctly register model parameters
         self._in_e2n_aggregators = in_e2n_aggregators
 
@@ -93,7 +94,7 @@ class NodeBlock(Block):
 class EdgeBlock(Block):
     """Edge block, nothing much to say"""
 
-    def __init__(self, updaters=None, independent=False):
+    def __init__(self, updaters=None, independent=False, device=torch.device('cpu')):
         """
 
         Parameters
@@ -103,7 +104,7 @@ class EdgeBlock(Block):
         independent: bool
             independent or not
         """
-        super().__init__(independent)
+        super().__init__(independent, device=device)
         self._updaters = nn.ModuleDict(updaters)  # this is needed to correctly register model parameters
 
     def forward(self, vdata, edata, connectivity, cdata):
@@ -151,7 +152,7 @@ class GlobalBlock(Block):
     #TODO rename this to context
     """
 
-    def __init__(self, updater=None, vertex_aggregator=None, edge_aggregators={}):
+    def __init__(self, updater=None, vertex_aggregator=None, edge_aggregators={}, device=torch.device('cpu')):
         """
 
         Parameters
@@ -164,7 +165,7 @@ class GlobalBlock(Block):
             one aggregator per type, if an aggregator is absent for a type, it will not be aggregated
 
         """
-        super().__init__((vertex_aggregator is None) and (edge_aggregators == {}))
+        super().__init__((vertex_aggregator is None) and (edge_aggregators == {}), device=device)
 
         if ((vertex_aggregator is None) != (edge_aggregators == {})):
             raise NotImplementedError("Vertex aggregators should both be None (independent case) or not None. "
@@ -199,11 +200,11 @@ class GlobalBlock(Block):
         else:
             # we need to use scatter aggregator here where index will show the graph id in the batched graph data
             #     def forward(self, x, indices, dim_size=None, dim=0):
-            vidx = torch.tensor([[i]*vsize for i,vsize in enumerate(metadata['vsizes'])]).flatten()
+            vidx = torch.tensor([[i]*vsize for i,vsize in enumerate(metadata['vsizes'])], device=self._device).flatten()
             tin = [cdata, self._vertex_aggregator(vdata, vidx)]
             # will fail for graphs with no edges/vertices #TODO
             for et in edata:
-                eidx = torch.tensor([[i] * esize for i, esize in enumerate(metadata['esizes'][et])]).flatten()
+                eidx = torch.tensor([[i] * esize for i, esize in enumerate(metadata['esizes'][et])], device=self._device).flatten()
                 tin.append(self._edge_aggregators[et](edata[et], eidx))
 
             tin = torch.cat(tin, dim=1)
