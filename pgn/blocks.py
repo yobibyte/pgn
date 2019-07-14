@@ -35,7 +35,7 @@ class Block(nn.Module):
 class NodeBlock(Block):
     """Node block"""
 
-    def __init__(self, updaters=None, in_e2n_aggregators=None):
+    def __init__(self, updater, in_e2n_aggregators={}):
         """
 
         Parameters
@@ -52,11 +52,11 @@ class NodeBlock(Block):
         But I do not have any empirical evidence for which approach is better for some particular problem.
 
         """
-        super().__init__(in_e2n_aggregators is None)
-        self._updaters = nn.ModuleDict(updaters)  # this is needed to correctly register model parameters
+        super().__init__(in_e2n_aggregators == {})
+        self._updater = updater  # this is needed to correctly register model parameters
         self._in_e2n_aggregators = in_e2n_aggregators
 
-    def forward(self, Gs):
+    def forward(self, vdata, edata, connectivity, cdata=None):
         """ make a forward pass for node entities
 
         Updaters work in a batched mode (take all the data tensor and feed to the updater),
@@ -71,49 +71,23 @@ class NodeBlock(Block):
         -------
             list of dicts with data tensors
         """
-
-        if isinstance(Gs, pg.Graph):
-            Gs = [Gs]
-        out = [{} for _ in Gs]
-        vdata = [g.vertex_data() for g in Gs]
-
+        #TODO check all the dims
         if self._independent:
-            for vt in vdata[0]:
-                vtin = torch.stack([el[vt] for el in vdata])
-                vtout = self._updaters[vt](vtin)
-                for el_idx, el in enumerate(vtout):
-                    out[el_idx][vt] = el
+            return self._updater(vdata)
         else:
-            edata = [g.edge_data() for g in Gs]
-            cdata = [g.context_data(concat=True) for g in Gs] if isinstance(Gs[0],
-                                                                            pg.DirectedGraphWithContext) else None
-            for vt in vdata[0]:
-                # TODO we can move aggregation outside of this loop and aggregate for all of the vertices first, and just access it further
+            aggregated = []
+            for at in self._in_e2n_aggregators:
+                agg = self._in_e2n_aggregators[at](edata[at], connectivity[at][1,:], dim_size=vdata.shape[0])
+                aggregated.append(agg)
 
-                aggregated = []
-                if self._in_e2n_aggregators is not None:
-                    for at in self._in_e2n_aggregators:
-                        stacked_edata = torch.stack([el[at] for el in edata])
-                        receiver_ids = torch.tensor(
-                            [g._receiver_ids[at] for g in Gs], requires_grad=False, device=edata[0][at].device).unsqueeze(-1).expand(-1,-1, *stacked_edata.shape[2:],)
-                        agg = self._in_e2n_aggregators[at](stacked_edata, receiver_ids, dim_size=vdata[0][vt].shape[0], dim=1)
-                        aggregated.append(agg)
+            aggregated = torch.cat(aggregated, dim=1)
 
-                aggregated = torch.cat(aggregated, dim=2)
+            # output for all the graphs
+            if cdata is not None:
+                return self._updater(torch.cat([aggregated, vdata, cdata], dim=1))
+            else:
+                return self._updater(torch.cat([aggregated, vdata], dim=1))
 
-                # output for all the graphs
-                if cdata is not None:
-                    curr_cdata = [el.repeat(vdata[el_id][vt].shape[0], 1) for el_id, el in enumerate(cdata)]
-                    curr_cdata = torch.stack(curr_cdata)
-                    vtin = torch.cat((aggregated, torch.stack([el[vt] for el in vdata]), curr_cdata), dim=2)
-                else:
-                    vtin = torch.cat((aggregated, torch.stack([el[vt] for el in vdata])), dim=2)
-
-                vtout = self._updaters[vt](vtin)
-                for el_idx, el in enumerate(vtout):
-                    out[el_idx][vt] = el
-                    # TODO the dims should be [graph, node, aggregated features], check this thoroughly
-        return out
 
 
 class EdgeBlock(Block):
@@ -132,7 +106,7 @@ class EdgeBlock(Block):
         super().__init__(independent)
         self._updaters = nn.ModuleDict(updaters)  # this is needed to correctly register model parameters
 
-    def forward(self, Gs):
+    def forward(self, vdata, edata, connectivity, cdata):
         """ make a forward pass for node entities
 
         Updaters work in a batched mode (take all the data tensor and feed to the updater),
@@ -154,47 +128,21 @@ class EdgeBlock(Block):
             list of dicts with data tensors
         """
 
-        if isinstance(Gs, pg.Graph):
-            Gs = [Gs]
-        out = [{} for _ in Gs]
-
         if self._independent:
-            for et in Gs[0].edge_data():
-                edata = torch.stack([g.edge_data(et) for g in Gs])
-                gout = self._updaters[et](edata)
-                for el_idx, el in enumerate(gout):
-                    out[el_idx][et] = el
+            return {et: self._updaters[et](ed) for et,ed in edata.items()}
         else:
-            vdata = torch.stack([g.vertex_data(g.default_vertex_type) for g in Gs])
-            cdata = [g.context_data(concat=True) for g in Gs] if isinstance(Gs[0],
-                                                                            pg.DirectedGraphWithContext) else None
+            #TODO implemente context cdata = [g.context_data(concat=True) for g in Gs] if isinstance(Gs[0],
+            #                                                                pg.DirectedGraphWithContext) else None
+            out = {}
 
-            for et in Gs[0].edge_data():
-
-                edata = torch.stack([g.edge_data(et) for g in Gs])
-
-                if Gs[0].num_vertex_types == 1:
-                    sender_ids = torch.tensor(
-                        [g._sender_ids[et] for g in Gs], requires_grad=False, device=vdata.device).unsqueeze(-1).expand(-1,-1, *vdata.shape[2:])
-                    receiver_ids = torch.tensor(
-                        [g._receiver_ids[et] for g in Gs], requires_grad=False, device=vdata.device).unsqueeze(-1).expand(-1,-1, *vdata.shape[2:],)
-                    sender_data = vdata.gather(1, sender_ids)
-                    receiver_data = vdata.gather(1, receiver_ids)
+            for et in edata:
+                senders, receivers = connectivity[et]
+                if cdata is None:
+                    out[et] = self._updaters[et](torch.cat([edata[et], vdata[senders], vdata[receivers]]))
                 else:
-                    raise NotImplementedError("Current implementation supports one vertex type only")
+                    out[et] = self._updaters[et](torch.cat([edata[et], vdata[senders], vdata[receivers], cdata[et]],dim=1))
 
-                if cdata is not None:
-                    curr_cdata = [el.repeat(edata[el_id].shape[0], 1) for el_id, el in enumerate(cdata)]
-                    curr_cdata = torch.stack(curr_cdata)
-                    etin = torch.cat((edata, sender_data, receiver_data, curr_cdata), dim=2)
-                else:
-                    etin = torch.cat((edata, sender_data, receiver_data), dim=2)
-
-                etout = self._updaters[et](etin)
-                for el_idx, el in enumerate(etout):
-                    out[el_idx][et] = el
-
-        return out
+            return out
 
 
 class GlobalBlock(Block):
@@ -203,7 +151,7 @@ class GlobalBlock(Block):
     #TODO rename this to context
     """
 
-    def __init__(self, updaters=None, vertex_aggregators=None, edge_aggregators=None):
+    def __init__(self, updater=None, vertex_aggregator=None, edge_aggregators={}):
         """
 
         Parameters
@@ -216,19 +164,18 @@ class GlobalBlock(Block):
             one aggregator per type, if an aggregator is absent for a type, it will not be aggregated
 
         """
+        super().__init__((vertex_aggregator is None) and (edge_aggregators == {}))
 
-        super().__init__(vertex_aggregators is None or edge_aggregators is None)
-
-        if (vertex_aggregators is None != edge_aggregators):
+        if ((vertex_aggregator is None) != (edge_aggregators == {})):
             raise NotImplementedError("Vertex aggregators should both be None (independent case) or not None. "
                                       "There is no implementation for other cases")
 
-        self._vertex_aggregators = vertex_aggregators
+        self._vertex_aggregator = vertex_aggregator
         self._edge_aggregators = edge_aggregators
-        self._updaters = nn.ModuleDict(updaters)
+        self._updater = updater
         # TODO Implement outgoing aggregators for the release
 
-    def forward(self, Gs):
+    def forward(self, cdata, vdata=None, edata=None, metadata=None):
         """ make a forward pass for node entities
 
         Updaters work in a batched mode (take all the data tensor and feed to the updater),
@@ -247,31 +194,20 @@ class GlobalBlock(Block):
             list of dicts with data tensors
         """
 
+        if self._independent:
+            return self._updater(cdata)
+        else:
+            # we need to use scatter aggregator here where index will show the graph id in the batched graph data
+            #     def forward(self, x, indices, dim_size=None, dim=0):
+            vidx = torch.tensor([[i]*vsize for i,vsize in enumerate(metadata['vsizes'])]).flatten()
+            tin = [cdata, self._vertex_aggregator(vdata, vidx)]
+            # will fail for graphs with no edges/vertices #TODO
+            for et in edata:
+                eidx = torch.tensor([[i] * esize for i, esize in enumerate(metadata['esizes'][et])]).flatten()
+                tin.append(self._edge_aggregators[et](edata[et], eidx))
 
-        if isinstance(Gs, pg.Graph):
-            Gs = [Gs]
-
-        out = [{} for _ in Gs]
-        cdata = [g.context_data() for g in Gs]
-
-        if not self._independent:
-            uin = []
-            for vt, agg in self._vertex_aggregators.items():
-                uin.append(torch.stack([agg(g.vertex_data(vt)) for g in Gs]))
-            for et, agg in self._edge_aggregators.items():
-                uin.append(torch.stack([agg(g.edge_data(et)) for g in Gs]))
-        for t in cdata[0]:
-            tin = torch.stack([el[t] for el in cdata])
-            if self._independent:
-                tout = self._updaters[t](tin)
-                for el_idx, el in enumerate(tout):
-                    out[el_idx][t] = el
-            else:
-                tin = torch.cat((tin, *uin), dim=2)
-                tout = self._updaters[t](tin)
-                for el_idx, el in enumerate(tout):
-                    out[el_idx][t] = el
-        return out
+            tin = torch.cat(tin, dim=1)
+            return self._updater(tin)
 
 
 class GraphNetwork(nn.Module):
@@ -283,29 +219,34 @@ class GraphNetwork(nn.Module):
         self._edge_block = edge_block
         self._global_block = global_block
 
-    def forward(self, Gs):
+    def forward(self, vdata, edata, connectivity, context=None, metadata=None):
         # make one pass as in the original paper
         # 1. Compute updated edge attributes
+
         if self._edge_block is not None:
-            edge_outs = self._edge_block(Gs)
-            for i, G in enumerate(Gs):
-                G.set_edge_data(edge_outs[i])
+            cdata = None
+            if context is not None:
+                # we need the same amount of cdata as esizes here
+                cdata = {}
+                for et in edata:
+                    cdata[et] = torch.cat([c.expand(metadata['esizes'][et][i], -1) for i, c in enumerate(context)])
+
+            edge_outs = self._edge_block(vdata, edata, connectivity, cdata)
 
         # 2. Aggregate edge attributes per node
         # 3. Compute updated node attributes
         if self._node_block is not None:
-            v_outs = self._node_block(Gs)
-            for i, G in enumerate(Gs):
-                G.set_vertex_data(v_outs[i])
+            cdata = None
+            if context is not None:
+                cdata = torch.cat([c.expand(metadata['vsizes'][i], -1)for i, c in enumerate(context)])
+            v_outs = self._node_block(vdata, edge_outs, connectivity, cdata)
 
         if self._global_block is not None:
             # 4. Aggregate edge attributes globally
             # 5. Aggregate node attributes globally
             # 6. Compute updated global attribute
-            g_outs = self._global_block(Gs)
-            for i, G in enumerate(Gs):
-                G.set_context_data(g_outs[i])
-        return [G.get_entities() for G in Gs]
+            g_outs = self._global_block(context, v_outs, edge_outs, metadata)
+        return v_outs, edge_outs, g_outs
 
 
 class IndependentGraphNetwork(nn.Module):
@@ -318,7 +259,7 @@ class IndependentGraphNetwork(nn.Module):
         self._edge_block = edge_block
         self._global_block = global_block
 
-    def forward(self, Gs):
+    def forward(self, vdata, edata, connectivity, cdata, metadata):
         # make one pass as in the original paper
         # 1. Compute updated edge attributes
 
@@ -327,25 +268,17 @@ class IndependentGraphNetwork(nn.Module):
         g_outs = None
 
         if self._edge_block is not None:
-            edge_outs = self._edge_block(Gs)
+            edata = self._edge_block(vdata, edata, connectivity, cdata)
 
         # 2. Aggregate edge attributes per node
         # 3. Compute updated node attributes
         if self._node_block is not None:
-            v_outs = self._node_block(Gs)
+            vdata = self._node_block(vdata, edata, connectivity, cdata)
 
         if self._global_block is not None:
             # 4. Aggregate edge attributes globally
             # 5. Aggregate node attributes globally
             # 6. Compute updated global attribute
-            g_outs = self._global_block(Gs)
+            cdata = self._global_block(cdata)
 
-        for i, G in enumerate(Gs):
-            if edge_outs is not None:
-                G.set_edge_data(edge_outs[i])
-            if v_outs is not None:
-                G.set_vertex_data(v_outs[i])
-            if g_outs is not None:
-                G.set_context_data(g_outs[i])
-
-        return [G.get_entities() for G in Gs]
+        return vdata, edata, cdata

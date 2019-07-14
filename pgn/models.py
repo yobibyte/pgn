@@ -146,34 +146,34 @@ class EncoderCoreDecoder(nn.Module):
                                                                                   *enc_global_shape,
                                                                                   independent=True)
 
-        self.encoder = IndependentGraphNetwork(NodeBlock({'vertex': enc_node_updater}),
-                                               EdgeBlock({'edge': enc_edge_updater}, independent=True),
-                                               GlobalBlock(
-                                                   {'context': enc_global_updater}) if enc_global_updater else None)
+        self.encoder = IndependentGraphNetwork(NodeBlock(enc_node_updater),
+                                               EdgeBlock({'default': enc_edge_updater}, independent=True),
+                                               GlobalBlock(enc_global_updater) if enc_global_updater else None)
+
 
         core_node_updater, core_edge_updater, core_global_updater = get_mlp_updaters(*core_vertex_shape,
                                                                                      *core_edge_shape,
                                                                                      *core_global_shape,
                                                                                      independent=False)
 
-        self.core = GraphNetwork(NodeBlock({'vertex': core_node_updater}, {'edge': MeanAggregator()}),
-                                 EdgeBlock({'edge': core_edge_updater}),
-                                 GlobalBlock({'context': core_global_updater}, {'vertex': NonScatterMeanAggregator()},
-                                             {'edge': NonScatterMeanAggregator()}) if core_global_updater else None)
+        self.core = GraphNetwork(NodeBlock(core_node_updater, {'default': MeanAggregator()}),
+                                 EdgeBlock({'default': core_edge_updater}),
+                                 GlobalBlock(core_global_updater, MeanAggregator(),
+                                             {'default': MeanAggregator()}) if core_global_updater else None)
 
         dec_node_updater, dec_edge_updater, dec_global_updater = get_mlp_updaters(*dec_vertex_shape,
                                                                                   *dec_edge_shape,
                                                                                   *dec_global_shape,
                                                                                   independent=True)
         self.decoder = IndependentGraphNetwork(
-            NodeBlock({'vertex': nn.Sequential(dec_node_updater, nn.Linear(dec_vertex_shape[-1], out_vertex_size))}),
-            EdgeBlock({'edge': nn.Sequential(dec_edge_updater, nn.Linear(dec_edge_shape[-1], out_edge_size))},
+            NodeBlock(nn.Sequential(dec_node_updater, nn.Linear(dec_vertex_shape[-1], out_vertex_size))),
+            EdgeBlock({'default': nn.Sequential(dec_edge_updater, nn.Linear(dec_edge_shape[-1], out_edge_size))},
                       independent=True),
-            GlobalBlock({'context': nn.Sequential(dec_global_updater, nn.Linear(dec_global_shape[-1],
-                                                                                out_global_size))}) if dec_global_updater else None,
+            GlobalBlock(nn.Sequential(dec_global_updater, nn.Linear(dec_global_shape[-1],
+                                                                                out_global_size))) if dec_global_updater else None,
         )
 
-    def forward(self, input_data, output_all_steps=False):
+    def forward(self, vdata, edata, connectivity, cdata, metadata, output_all_steps=False):
         """Make a forward pass
 
         Encoder -> k Core iterations -> Decoder (or each decoder pass after each core pass)
@@ -194,35 +194,19 @@ class EncoderCoreDecoder(nn.Module):
         """
 
         # this data won't change during the core computation
-        latents0_data = self.encoder([self._input_type(d) for d in input_data])
+        latents0_data = self.encoder(vdata, edata, connectivity, cdata, metadata)
+        latents_data = latents0_data
 
-        latents_data = [el for el in latents0_data]
         outputs = []
-
         for s in range(self._core_steps):
-            concatenated = []
-            for l0, l in zip(latents0_data, latents_data):
-                concatenated.append(self._input_type(concat_entities([l0,l], latents0_data[0].items())))
-            latents_data = self.core(concatenated)
+
+            v, e, c = concat_entities([latents0_data, latents_data])
+            v, e, c = self.core(v, e, connectivity, c, metadata)
 
             if output_all_steps or s + 1 == self._core_steps:
-                outputs.append(self.decoder([self._input_type(d) for d in latents_data]))
+                outputs.append(self.decoder(v, e, connectivity, c, metadata))
 
         if not output_all_steps:
             return outputs[-1]
         return outputs
 
-    def process_batch(self, input_graphs, compute_grad=True):
-        """This used to do batching which is moved to the GraphNetwork now. We have only eval->train mode here now"""
-        # TODO this should probably go away
-        # I think, just doing model.eval() from outside is enough
-
-        if not compute_grad:
-            self.eval()
-
-        outs = self(input_graphs, output_all_steps=True)
-
-        if not compute_grad:
-            self.train()
-
-        return outs

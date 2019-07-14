@@ -1,11 +1,45 @@
 import networkx as nx
 import torch
+import numpy as np
 from networkx.drawing.nx_agraph import to_agraph
-from pgn.graph import DirectedEdge, DirectedGraph, Vertex
+from pgn.graph import DirectedGraph
 
 # TODO this, probably, should go to the pymarl code
 EDGE_COLOURS = {'edge': 'black', 'action': 'black', 'relation': 'orange'}
 LAYOUTS = ['neato', 'dot', 'twopi', 'circo', 'fdp', 'sfdp']  # layouts that worked on my machine
+
+def batch_data(graph_list):
+    vdata = [el[0] for el in graph_list]
+    edata = [el[1] for el in graph_list]
+    connectivity = [el[2] for el in graph_list]
+    if len(graph_list[0]) > 3:
+        cdata = torch.cat([el[3] for el in graph_list])
+    else:
+        cdata = None
+
+    if type(edata[0]) != dict:
+        edata = [{'default': el} for el in edata]
+        connectivity = [{'default': el} for el in connectivity]
+
+    vsizes = [v.shape[0] for v in vdata]
+    vdata = torch.cat(vdata)
+    # now we need to fix connectivity since we stacked different graphs
+    vcumsum = np.cumsum(vsizes)
+
+
+    esizes = {}
+    edata_d = {}
+    connectivity_d = {}
+    for et in edata[0]:
+        esizes[et] = [e[et].shape[0] for e in edata]
+        edata_d[et] = torch.cat([el[et] for el in edata])
+        connectivity_d[et] = torch.cat([conn[et] for conn in connectivity],dim=1)
+        # TODO replace this with roll and setting the last element to 0
+        correction = torch.cat([torch.zeros(esizes[et][0],dtype=torch.long), *[torch.tensor([el]*esizes[et][i],dtype=torch.long) for i,el in enumerate(vcumsum[:-1])]] )
+        connectivity_d[et] += correction.expand(2,-1)
+
+    return vdata, edata_d, connectivity_d, cdata, {'vsizes': vsizes, 'esizes': esizes}
+
 
 
 def generate_graph():
@@ -88,13 +122,22 @@ def plot_graph(g, fname='graph.pdf'):
     a.draw(fname)
 
 
-def concat_entities(entities, template):
-    res = {k: {et: {} for et in v} for k, v in template}
-    for et, ed in res.items():
-        for est in ed:
-            res[et][est]['data'] = torch.cat([el[et][est]['data'] for el in entities], dim=1)
-            res[et][est]['info'] = entities[0][et][est]['info']
-    return res
+def concat_entities(entities):
+
+
+    has_global = len(entities[0]) == 3
+
+    v = torch.cat([el[0] for el in entities], dim=1)
+
+    e = {}
+    for k in entities[0][1].keys():
+        e[k] = torch.cat([el[1][k] for el in entities], dim=1)
+
+    c = None
+    if has_global:
+        c = torch.cat([el[2] for el in entities], dim=1)
+
+    return v, e, c
 
 if __name__ == '__main__':
     g = generate_graph()

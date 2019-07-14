@@ -22,64 +22,6 @@ We might have a batched version of the above. Then it is a list of dicts shown a
 """
 
 
-class Entity(object):
-    """Basic container for graph entities, i.e. edges, vertices, global attributes
-
-    This used to have @properties instead of fields, but this was quite slow and I switched back to fields.
-    """
-
-    def __init__(self, id, type, hidden_info=None):
-        """
-
-        Parameters
-        ----------
-        id: int
-            Id of an entity enables us to locate its data in the data tensor:
-            ent_data = graph._vertex_data[self.type][self.id]
-        type: str
-            Type of an entity.
-        hidden_info: dict
-            A container to store metadata which might be useful for some semantical
-            properties which the library does not care about. For instance, you might want to do something with some of
-            the vertices of the output graph, but you still want to process them as a whole and not introduce a second
-            vertex type for that.
-        """
-        self.id = id
-        self.type = type
-        self.hidden_info = hidden_info
-
-
-class DirectedEdge(Entity):
-    """A directed edge sender -> receiver"""
-
-    def __init__(self, id, sender, receiver, type='edge', hidden_info=None):
-        super().__init__(id, type, hidden_info=hidden_info)
-        self.sender = sender
-        self.receiver = receiver
-
-
-class Vertex(Entity):
-    def __init__(self, id, type='vertex', hidden_info=None):
-        """Vertex entity
-
-        We double the information we store in incoming_edges/outgoing_edges (senders/receivers for edges) since we
-        do not want to recompute this each time we run the forward pass of a Graph Network.
-        """
-
-        super().__init__(id, type, hidden_info=hidden_info)
-        self.incoming_edges = None
-        self.outgoing_edges = None
-
-
-class Context(Entity):
-    """Graph context. In the Battaglia et al.,2018 paper it is called the global attribute u. I prefer to call it 'c'
-    since in multi-agent RL we use 'u' for actions.
-    """
-
-    def __init__(self, id, type='context', hidden_info=None):
-        super().__init__(id, type, hidden_info=hidden_info)
-
-
 class Graph(object):
     def __init__(self):
         """Metadata stores any information (in tensors) we might use to help with using the output of the graph net.
@@ -98,7 +40,7 @@ class DirectedGraph(Graph):
 
     """
 
-    def __init__(self, entities, safemode=False):
+    def __init__(self, vertex_data, edge_data, connectivity, metadata=None, safemode=False):
         """Constructor of a directed graph
 
         Parameters
@@ -115,29 +57,18 @@ class DirectedGraph(Graph):
         # and the value is the dict with the 'data' and 'info' which has a list of all the entities where their index
         # in the array corresponds to the index in the fist dimension of the data tensor
         # [{'data': tf.Tensor, 'info': []}, ]
-        self._vertices = {k: v.copy() for k, v in entities['vertex'].items()}
-        self._edges = {k: v.copy() for k, v in entities['edge'].items()}
 
+        self._vertex_data = vertex_data
+        self._edge_data = {k:v for k,v in edge_data.items()}
+        self._connectivity = connectivity
 
-        if 'sender_ids' not in entities:
-            self._sender_ids = {k: [el.sender.id for el in self.edge_info(k)] for k,v in self._edges.items()}
-            entities['sender_ids'] = self._sender_ids
-        else:
-            self._sender_ids = entities['sender_ids']
-        if 'receiver_ids' not in entities:
-            self._receiver_ids = {k: [el.receiver.id for el in self.edge_info(k)] for k,v in self._edges.items()}
-            entities['receiver_ids'] = self._receiver_ids
-        else:
-            self._receiver_ids = entities['receiver_ids']
-
-        if 'metadata' in entities:
-            self._metadata = entities['metadata'].copy()  # not a deep copy and I mean it
 
         if safemode:
             self.safety_check()
 
     def safety_check(self):
         """Safety check described in the constructor of the class"""
+        raise NotImplementedError("This has not been refactored yet.")
 
         for t, v in self._vertices.items():
             for vid, el in enumerate(v['info']):
