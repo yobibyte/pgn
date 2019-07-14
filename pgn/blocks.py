@@ -78,7 +78,7 @@ class NodeBlock(Block):
         else:
             aggregated = []
             for at in self._in_e2n_aggregators:
-                agg = self._in_e2n_aggregators[at](edata[at], connectivity[at][1,:], dim_size=vdata.shape[0])
+                agg = self._in_e2n_aggregators[at](edata[at], connectivity[at][1, :], dim_size=vdata.shape[0])
                 aggregated.append(agg)
 
             aggregated = torch.cat(aggregated, dim=1)
@@ -130,7 +130,7 @@ class EdgeBlock(Block):
         """
 
         if self._independent:
-            return {et: self._updaters[et](ed) for et,ed in edata.items()}
+            return {et: self._updaters[et](ed) for et, ed in edata.items()}
         else:
             #TODO implemente context cdata = [g.context_data(concat=True) for g in Gs] if isinstance(Gs[0],
             #                                                                pg.DirectedGraphWithContext) else None
@@ -141,7 +141,7 @@ class EdgeBlock(Block):
                 if cdata is None:
                     out[et] = self._updaters[et](torch.cat([edata[et], vdata[senders], vdata[receivers]]))
                 else:
-                    out[et] = self._updaters[et](torch.cat([edata[et], vdata[senders], vdata[receivers], cdata[et]],dim=1))
+                    out[et] = self._updaters[et](torch.cat([edata[et], vdata[senders], vdata[receivers], cdata[et]], dim=1))
 
             return out
 
@@ -263,10 +263,6 @@ class IndependentGraphNetwork(nn.Module):
     def forward(self, vdata, edata, connectivity, cdata, metadata):
         # make one pass as in the original paper
         # 1. Compute updated edge attributes
-
-        edge_outs = None
-        v_outs = None
-        g_outs = None
 
         if self._edge_block is not None:
             edata = self._edge_block(vdata, edata, connectivity, cdata)

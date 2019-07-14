@@ -35,6 +35,7 @@ def batch_data(graph_list):
         edata_d[et] = torch.cat([el[et] for el in edata])
         connectivity_d[et] = torch.cat([conn[et] for conn in connectivity],dim=1)
         # TODO replace this with roll and setting the last element to 0
+
         correction = torch.cat([torch.zeros(esizes[et][0],dtype=torch.long), *[torch.tensor([el]*esizes[et][i],dtype=torch.long) for i,el in enumerate(vcumsum[:-1])]] )
         connectivity_d[et] += correction.expand(2,-1)
 
@@ -123,7 +124,6 @@ def plot_graph(g, fname='graph.pdf'):
 
 
 def concat_entities(entities):
-
 
     has_global = len(entities[0]) == 3
 

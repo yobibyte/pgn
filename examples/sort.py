@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-from pgn.graph import DirectedGraphWithContext
 from pgn.models import EncoderCoreDecoder
 from pgn.utils import pgn2nx, plot_graph, batch_data
 
@@ -131,11 +130,14 @@ def batch_loss(outs, targets, criterion, batch_size=32):
         Shows how good your mode is.
     """
     loss = 0
+
+    vsize = targets[0].shape[0]//batch_size
+    esize = targets[1].shape[0]//batch_size
     for out in outs:
-        for i in range(out[0].shape[0]//batch_size):
-            loss+=criterion(out[0][i*batch_size:(i+1)*batch_size], targets[0][i*batch_size:(i+1)*batch_size])
-        for i in range(out[1]['default'].shape[0] // batch_size):
-            loss+=criterion(out[1]['default'][i*batch_size:(i+1)*batch_size], targets[1][i*batch_size:(i+1)*batch_size])
+        for i in range(vsize//batch_size):
+            loss+=criterion(out[0][i*vsize:(i+1)*vsize], targets[0][i*vsize:(i+1)*vsize])
+        for i in range(esize // batch_size):
+            loss+=criterion(out[1]['default'][i*esize:(i+1)*esize], targets[1][i*esize:(i+1)*esize])
     return loss
 
 
@@ -181,8 +183,6 @@ def run():
     if args.plot_graph_sample:
         ng = pgn2nx(train_input[0])
         plot_graph(ng, fname='input_graph.pdf')
-
-
 
     optimiser = torch.optim.Adam(lr=0.001, params=model.parameters())
     criterion = nn.BCEWithLogitsLoss()
