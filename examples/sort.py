@@ -239,8 +239,11 @@ def run():
 
     test_g = list(batch_data([test_g]))
     if args.cuda and torch.cuda.is_available():
-        for i,el in enumerate(test_g):
-            test_g[i] = el.cuda()
+        test_g[0] = test_g[0].to('cuda')
+        for k in test_g[1]:
+            test_g[1][k] = test_g[1][k].to('cuda')
+            test_g[2][k] = test_g[2][k].to('cuda')
+        test_g[3] = test_g[3].to('cuda')
 
     model.eval()
     g = model(*test_g)[1]['default']
