@@ -139,7 +139,7 @@ class EdgeBlock(Block):
             for et in edata:
                 senders, receivers = connectivity[et]
                 if cdata is None:
-                    out[et] = self._updaters[et](torch.cat([edata[et], vdata[senders], vdata[receivers]]))
+                    out[et] = self._updaters[et](torch.cat([edata[et], vdata[senders], vdata[receivers]], dim=1))
                 else:
                     out[et] = self._updaters[et](torch.cat([edata[et], vdata[senders], vdata[receivers], cdata[et]], dim=1))
 
@@ -205,7 +205,7 @@ class GlobalBlock(Block):
             # will fail for graphs with no edges/vertices #TODO
             for et in edata:
                 eidx = torch.tensor([[i] * esize for i, esize in enumerate(metadata['esizes'][et])], device=self._device).flatten()
-                tin.append(self._edge_aggregators[et](edata[et], eidx))
+                tin.append(self._edge_aggregators[et](edata[et], eidx, dim_size=cdata.shape[0]))
 
             tin = torch.cat(tin, dim=1)
             return self._updater(tin)
@@ -223,7 +223,9 @@ class GraphNetwork(nn.Module):
     def forward(self, vdata, edata, connectivity, context=None, metadata=None):
         # make one pass as in the original paper
         # 1. Compute updated edge attributes
-
+        eout = None
+        vout = None
+        cout = None
         if self._edge_block is not None:
             cdata = None
             if context is not None:
@@ -232,7 +234,7 @@ class GraphNetwork(nn.Module):
                 for et in edata:
                     cdata[et] = torch.cat([c.expand(metadata['esizes'][et][i], -1) for i, c in enumerate(context)])
 
-            edge_outs = self._edge_block(vdata, edata, connectivity, cdata)
+            eout = self._edge_block(vdata, edata, connectivity, cdata)
 
         # 2. Aggregate edge attributes per node
         # 3. Compute updated node attributes
@@ -240,14 +242,14 @@ class GraphNetwork(nn.Module):
             cdata = None
             if context is not None:
                 cdata = torch.cat([c.expand(metadata['vsizes'][i], -1)for i, c in enumerate(context)])
-            v_outs = self._node_block(vdata, edge_outs, connectivity, cdata)
+            vout = self._node_block(vdata, eout, connectivity, cdata)
 
         if self._global_block is not None:
             # 4. Aggregate edge attributes globally
             # 5. Aggregate node attributes globally
             # 6. Compute updated global attribute
-            g_outs = self._global_block(context, v_outs, edge_outs, metadata)
-        return v_outs, edge_outs, g_outs
+            cout = self._global_block(context, vout, eout, metadata)
+        return vout, eout, cout
 
 
 class IndependentGraphNetwork(nn.Module):
@@ -263,19 +265,23 @@ class IndependentGraphNetwork(nn.Module):
     def forward(self, vdata, edata, connectivity, cdata, metadata):
         # make one pass as in the original paper
         # 1. Compute updated edge attributes
+        eout = None
+        vout = None
+        cout = None
+
 
         if self._edge_block is not None:
-            edata = self._edge_block(vdata, edata, connectivity, cdata)
+            eout = self._edge_block(vdata, edata, connectivity, cdata)
 
         # 2. Aggregate edge attributes per node
         # 3. Compute updated node attributes
         if self._node_block is not None:
-            vdata = self._node_block(vdata, edata, connectivity, cdata)
+            vout = self._node_block(vdata, edata, connectivity, cdata)
 
         if self._global_block is not None:
             # 4. Aggregate edge attributes globally
             # 5. Aggregate node attributes globally
             # 6. Compute updated global attribute
-            cdata = self._global_block(cdata)
+            cout = self._global_block(cdata)
 
-        return vdata, edata, cdata
+        return vout, eout, cout

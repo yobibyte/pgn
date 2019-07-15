@@ -34,29 +34,11 @@ def batch_data(graph_list):
         esizes[et] = [e[et].shape[0] for e in edata]
         edata_d[et] = torch.cat([el[et] for el in edata])
         connectivity_d[et] = torch.cat([conn[et] for conn in connectivity],dim=1)
-        # TODO replace this with roll and setting the last element to 0
-
-        correction = torch.cat([torch.zeros(esizes[et][0],dtype=torch.long), *[torch.tensor([el]*esizes[et][i],dtype=torch.long) for i,el in enumerate(vcumsum[:-1])]] )
-        connectivity_d[et] += correction.expand(2,-1)
+        # # TODO replace this with roll and setting the last element to 0
+        # correction = torch.cat([torch.zeros(esizes[et][0],dtype=torch.long), *[torch.tensor([el]*esizes[et][i],dtype=torch.long) for i,el in enumerate(vcumsum[:-1])]])
+        # connectivity_d[et] += correction
 
     return vdata, edata_d, connectivity_d, cdata, {'vsizes': vsizes, 'esizes': esizes}
-
-
-
-def generate_graph():
-    """Method to generate a simple graph for testing purposes"""
-
-    vinfo = [Vertex(id=i) for i in range(2)]
-    vertices = {'data': torch.Tensor([[0], [1]]), 'info': vinfo}
-
-    edges = {'data': torch.Tensor([[0], [1], [2]]),
-             'info': [
-                 DirectedEdge(0, vinfo[0], vinfo[1]),
-                 DirectedEdge(1, vinfo[0], vinfo[1]),
-                 DirectedEdge(2, vinfo[1], vinfo[0])
-             ]}
-
-    return DirectedGraph([vertices, edges])
 
 
 def pgn2nx(ig):
@@ -124,8 +106,7 @@ def plot_graph(g, fname='graph.pdf'):
 
 
 def concat_entities(entities):
-
-    has_global = len(entities[0]) == 3
+    has_global = len(entities[0]) == 3 and entities[0][2] is not None
 
     v = torch.cat([el[0] for el in entities], dim=1)
 
@@ -138,8 +119,3 @@ def concat_entities(entities):
         c = torch.cat([el[2] for el in entities], dim=1)
 
     return v, e, c
-
-if __name__ == '__main__':
-    g = generate_graph()
-    ng = pgn2nx(g)
-    plot_graph(ng)
