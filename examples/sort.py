@@ -13,7 +13,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from pgn.models import EncoderCoreDecoder
-from pgn.utils import pgn2nx, plot_graph, batch_data
+from pgn.utils import batch_data
 
 torch.set_num_threads(4)
 
@@ -156,7 +156,6 @@ def plot_test(model, length, cuda=False):
             test_g[1][k] = test_g[1][k].to('cuda')
             test_g[2][k] = test_g[2][k].to('cuda')
 
-    model.eval()
     g = model(*test_g)[1]['default']
     conn = test_g[2]['default']
 
@@ -201,16 +200,11 @@ def run():
                                dec_edge_shape=(16, 16),
                                out_edge_size=2,
                                device=device)
-    # # plot one of the input graphs
-    # if args.plot_graph_sample:
-    #     ng = pgn2nx(train_input[0])
-    #     plot_graph(ng, fname='input_graph.pdf')
-    #
+
     optimiser = torch.optim.Adam(lr=0.001, params=model.parameters())
     criterion = nn.BCEWithLogitsLoss()
 
     train_input, train_target = generate_graph_batch(args.num_train, sample_length=args.sample_length)
-    unsorted = train_input[0][0].flatten()
 
     eval_input, eval_target = generate_graph_batch(args.num_train, sample_length=args.sample_length)
     train_input = list(batch_data(train_input))
