@@ -144,9 +144,9 @@ def batch_loss(outs, targets, criterion, batch_size, core_steps):
 
 
 
-def plot_test(unsorted, model, cuda=False):
+def plot_test(model, length, cuda=False):
 
-    #unsorted = np.random.uniform(size=args.sample_length)
+    unsorted = np.random.uniform(size=length)
     test_g = graph_data_from_list(unsorted)
 
     test_g = list(batch_data([test_g]))
@@ -254,8 +254,7 @@ def run():
             print("Epoch %d, mean training loss: %f, mean evaluation loss: %f."
                   % (e, train_loss.item() / args.num_train, eval_loss.item() / args.num_eval))
 
-            plot_test(unsorted, model, args.cuda)
-
+            plot_test(model, args.sample_length, args.cuda)
             model.train()
 
 
