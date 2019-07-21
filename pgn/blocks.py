@@ -135,9 +135,10 @@ class EdgeBlock(Block):
             #TODO implemente context cdata = [g.context_data(concat=True) for g in Gs] if isinstance(Gs[0],
             #                                                                pg.DirectedGraphWithContext) else None
             out = {}
-
             for et in edata:
                 senders, receivers = connectivity[et]
+
+
                 if cdata is None:
                     out[et] = self._updaters[et](torch.cat([edata[et], vdata[senders], vdata[receivers]], dim=1))
                 else:
