@@ -35,7 +35,7 @@ def batch_data(graph_list):
         edata_d[et] = torch.cat([el[et] for el in edata])
         connectivity_d[et] = torch.cat([conn[et] for conn in connectivity],dim=1)
         # # TODO replace this with roll and setting the last element to 0
-        correction = torch.cat([torch.zeros(esizes[et][0],dtype=torch.long), *[torch.tensor([el]*esizes[et][i],dtype=torch.long) for i,el in enumerate(vcumsum[:-1])]])
+        correction = torch.cat([torch.zeros(esizes[et][0], dtype=torch.long, device=vdata.device), *[torch.tensor([el]*esizes[et][i],dtype=torch.long, device=vdata.device) for i,el in enumerate(vcumsum[:-1])]])
         connectivity_d[et] += correction
 
     return vdata, edata_d, connectivity_d, cdata, {'vsizes': vsizes, 'esizes': esizes}
