@@ -3,6 +3,7 @@ import pgn.graph as pg
 import torch
 import torch.nn as nn
 
+
 class Block(nn.Module):
     """A building block of my graph network kingdom.
 
@@ -36,7 +37,7 @@ class Block(nn.Module):
 class NodeBlock(Block):
     """Node block"""
 
-    def __init__(self, updater, in_e2n_aggregators={}, device=torch.device('cpu')):
+    def __init__(self, updater, in_e2n_aggregators={}, device=torch.device("cpu")):
         """
 
         Parameters
@@ -72,13 +73,15 @@ class NodeBlock(Block):
         -------
             list of dicts with data tensors
         """
-        #TODO check all the dims
+        # TODO check all the dims
         if self._independent:
             return self._updater(vdata)
         else:
             aggregated = []
             for at in self._in_e2n_aggregators:
-                agg = self._in_e2n_aggregators[at](edata[at], connectivity[at][1, :], dim_size=vdata.shape[0])
+                agg = self._in_e2n_aggregators[at](
+                    edata[at], connectivity[at][1, :], dim_size=vdata.shape[0]
+                )
                 aggregated.append(agg)
 
             aggregated = torch.cat(aggregated, dim=1)
@@ -90,11 +93,10 @@ class NodeBlock(Block):
                 return self._updater(torch.cat([aggregated, vdata], dim=1))
 
 
-
 class EdgeBlock(Block):
     """Edge block, nothing much to say"""
 
-    def __init__(self, updaters=None, independent=False, device=torch.device('cpu')):
+    def __init__(self, updaters=None, independent=False, device=torch.device("cpu")):
         """
 
         Parameters
@@ -105,7 +107,9 @@ class EdgeBlock(Block):
             independent or not
         """
         super().__init__(independent, device=device)
-        self._updaters = nn.ModuleDict(updaters)  # this is needed to correctly register model parameters
+        self._updaters = nn.ModuleDict(
+            updaters
+        )  # this is needed to correctly register model parameters
 
     def forward(self, vdata, edata, connectivity, cdata):
         """ make a forward pass for node entities
@@ -132,17 +136,23 @@ class EdgeBlock(Block):
         if self._independent:
             return {et: self._updaters[et](ed) for et, ed in edata.items()}
         else:
-            #TODO implemente context cdata = [g.context_data(concat=True) for g in Gs] if isinstance(Gs[0],
+            # TODO implemente context cdata = [g.context_data(concat=True) for g in Gs] if isinstance(Gs[0],
             #                                                                pg.DirectedGraphWithContext) else None
             out = {}
             for et in edata:
                 senders, receivers = connectivity[et]
 
-
                 if cdata is None:
-                    out[et] = self._updaters[et](torch.cat([edata[et], vdata[senders], vdata[receivers]], dim=1))
+                    out[et] = self._updaters[et](
+                        torch.cat([edata[et], vdata[senders], vdata[receivers]], dim=1)
+                    )
                 else:
-                    out[et] = self._updaters[et](torch.cat([edata[et], vdata[senders], vdata[receivers], cdata[et]], dim=1))
+                    out[et] = self._updaters[et](
+                        torch.cat(
+                            [edata[et], vdata[senders], vdata[receivers], cdata[et]],
+                            dim=1,
+                        )
+                    )
 
             return out
 
@@ -153,7 +163,13 @@ class GlobalBlock(Block):
     #TODO rename this to context
     """
 
-    def __init__(self, updater=None, vertex_aggregator=None, edge_aggregators={}, device=torch.device('cpu')):
+    def __init__(
+        self,
+        updater=None,
+        vertex_aggregator=None,
+        edge_aggregators={},
+        device=torch.device("cpu"),
+    ):
         """
 
         Parameters
@@ -166,11 +182,15 @@ class GlobalBlock(Block):
             one aggregator per type, if an aggregator is absent for a type, it will not be aggregated
 
         """
-        super().__init__((vertex_aggregator is None) and (edge_aggregators == {}), device=device)
+        super().__init__(
+            (vertex_aggregator is None) and (edge_aggregators == {}), device=device
+        )
 
-        if ((vertex_aggregator is None) != (edge_aggregators == {})):
-            raise NotImplementedError("Vertex aggregators should both be None (independent case) or not None. "
-                                      "There is no implementation for other cases")
+        if (vertex_aggregator is None) != (edge_aggregators == {}):
+            raise NotImplementedError(
+                "Vertex aggregators should both be None (independent case) or not None. "
+                "There is no implementation for other cases"
+            )
 
         self._vertex_aggregator = vertex_aggregator
         self._edge_aggregators = edge_aggregators
@@ -201,12 +221,20 @@ class GlobalBlock(Block):
         else:
             # we need to use scatter aggregator here where index will show the graph id in the batched graph data
             #     def forward(self, x, indices, dim_size=None, dim=0):
-            vidx = torch.tensor([[i]*vsize for i,vsize in enumerate(metadata['vsizes'])], device=self._device).flatten()
+            vidx = torch.tensor(
+                [[i] * vsize for i, vsize in enumerate(metadata["vsizes"])],
+                device=self._device,
+            ).flatten()
             tin = [cdata, self._vertex_aggregator(vdata, vidx)]
             # will fail for graphs with no edges/vertices #TODO
             for et in edata:
-                eidx = torch.tensor([[i] * esize for i, esize in enumerate(metadata['esizes'][et])], device=self._device).flatten()
-                tin.append(self._edge_aggregators[et](edata[et], eidx, dim_size=cdata.shape[0]))
+                eidx = torch.tensor(
+                    [[i] * esize for i, esize in enumerate(metadata["esizes"][et])],
+                    device=self._device,
+                ).flatten()
+                tin.append(
+                    self._edge_aggregators[et](edata[et], eidx, dim_size=cdata.shape[0])
+                )
 
             tin = torch.cat(tin, dim=1)
             return self._updater(tin)
@@ -233,7 +261,12 @@ class GraphNetwork(nn.Module):
                 # we need the same amount of cdata as esizes here
                 cdata = {}
                 for et in edata:
-                    cdata[et] = torch.cat([c.expand(metadata['esizes'][et][i], -1) for i, c in enumerate(context)])
+                    cdata[et] = torch.cat(
+                        [
+                            c.expand(metadata["esizes"][et][i], -1)
+                            for i, c in enumerate(context)
+                        ]
+                    )
 
             eout = self._edge_block(vdata, edata, connectivity, cdata)
 
@@ -242,7 +275,9 @@ class GraphNetwork(nn.Module):
         if self._node_block is not None:
             cdata = None
             if context is not None:
-                cdata = torch.cat([c.expand(metadata['vsizes'][i], -1)for i, c in enumerate(context)])
+                cdata = torch.cat(
+                    [c.expand(metadata["vsizes"][i], -1) for i, c in enumerate(context)]
+                )
             vout = self._node_block(vdata, eout, connectivity, cdata)
 
         if self._global_block is not None:
@@ -269,7 +304,6 @@ class IndependentGraphNetwork(nn.Module):
         eout = None
         vout = None
         cout = None
-
 
         if self._edge_block is not None:
             eout = self._edge_block(vdata, edata, connectivity, cdata)

@@ -28,7 +28,9 @@ class Aggregator(nn.Module):
         return self._type
 
     def forward(self, *input):
-        raise NotImplementedError("I am a simple man. All the implementation should be in my children.")
+        raise NotImplementedError(
+            "I am a simple man. All the implementation should be in my children."
+        )
 
 
 class MeanAggregator(Aggregator):
@@ -54,6 +56,7 @@ class MeanAggregator(Aggregator):
         """
 
         return scatter_mean(x, indices, dim=dim, dim_size=dim_size)
+
 
 class NonScatterMeanAggregator(Aggregator):
     """Average along the 0-th dimension (per entity)"""

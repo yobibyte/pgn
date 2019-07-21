@@ -40,7 +40,9 @@ class DirectedGraph(Graph):
 
     """
 
-    def __init__(self, vertex_data, edge_data, connectivity, metadata=None, safemode=False):
+    def __init__(
+        self, vertex_data, edge_data, connectivity, metadata=None, safemode=False
+    ):
         """Constructor of a directed graph
 
         Parameters
@@ -59,9 +61,8 @@ class DirectedGraph(Graph):
         # [{'data': tf.Tensor, 'info': []}, ]
 
         self._vertex_data = vertex_data
-        self._edge_data = {k:v for k,v in edge_data.items()}
+        self._edge_data = {k: v for k, v in edge_data.items()}
         self._connectivity = connectivity
-
 
         if safemode:
             self.safety_check()
@@ -71,38 +72,51 @@ class DirectedGraph(Graph):
         raise NotImplementedError("This has not been refactored yet.")
 
         for t, v in self._vertices.items():
-            for vid, el in enumerate(v['info']):
+            for vid, el in enumerate(v["info"]):
                 if vid != el.id:
                     raise ValueError(
                         "The vertex with index {} should be a {}-th element in the vertex array of type {}".format(
-                            el.id, el.id, t))
+                            el.id, el.id, t
+                        )
+                    )
 
-            if self.num_vertices(t) != len(v['info']):
-                raise ValueError("The first dimension of vertices data of type %s is different "
-                                 "from the number of edges in the 'info' list" % t)
+            if self.num_vertices(t) != len(v["info"]):
+                raise ValueError(
+                    "The first dimension of vertices data of type %s is different "
+                    "from the number of edges in the 'info' list" % t
+                )
 
         for t, v in self._edges.items():
-            for eid, el in enumerate(v['info']):
+            for eid, el in enumerate(v["info"]):
                 if eid != el.id:
                     raise ValueError(
-                        "The edge with index {} should be a {}-th element in the edge array of type {}".format(el.id,
-                                                                                                               el.id,
-                                                                                                               t))
+                        "The edge with index {} should be a {}-th element in the edge array of type {}".format(
+                            el.id, el.id, t
+                        )
+                    )
 
-            if self.num_edges(t) != len(v['info']):
-                raise ValueError("The first dimension of edges data of type %s is different "
-                                 "from the number of edges in the 'info' list" % t)
+            if self.num_edges(t) != len(v["info"]):
+                raise ValueError(
+                    "The first dimension of edges data of type %s is different "
+                    "from the number of edges in the 'info' list" % t
+                )
 
             # get corresponding vertex type
-            for e in v['info']:
-                if e.sender.id not in range(self.num_vertices(v['info'][0].sender.type)):
+            for e in v["info"]:
+                if e.sender.id not in range(
+                    self.num_vertices(v["info"][0].sender.type)
+                ):
                     raise ValueError(
                         "Sender %d for edge %d of type %s is invalid. It's either its id is negative or bigger "
-                        "then number of your nodes. " % (e.sender.id, e.id, e.type))
-                if e.receiver.id not in range(self.num_vertices(v['info'][0].receiver.type)):
+                        "then number of your nodes. " % (e.sender.id, e.id, e.type)
+                    )
+                if e.receiver.id not in range(
+                    self.num_vertices(v["info"][0].receiver.type)
+                ):
                     raise ValueError(
                         "Receiver %d for edge %d of type %s is invalid. It's either its id is negative or bigger "
-                        "then number of your nodes. " % (e.receiver.id, e.id, e.type))
+                        "then number of your nodes. " % (e.receiver.id, e.id, e.type)
+                    )
 
     def num_vertices(self, type):
         """How many vertices of 'type' type does the graph have?
@@ -117,7 +131,7 @@ class DirectedGraph(Graph):
         num: int
             number of the entities of the requested type
         """
-        return self._vertices[type]['data'].shape[0]
+        return self._vertices[type]["data"].shape[0]
 
     def num_edges(self, type):
         """How many edges of 'type' type does the graph have?
@@ -133,7 +147,7 @@ class DirectedGraph(Graph):
             number of the entities of the requested type
         """
 
-        return self._edges[type]['data'].shape[0]
+        return self._edges[type]["data"].shape[0]
 
     @property
     def num_edge_types(self):
@@ -160,9 +174,9 @@ class DirectedGraph(Graph):
             Otherwise, you'll get a dict of the following format {'vertex_type_1': data_tensor, ...}
         """
         if type is None:
-            return {k: v['data'] for k, v in self._vertices.items()}
+            return {k: v["data"] for k, v in self._vertices.items()}
         else:
-            return self._vertices[type]['data']
+            return self._vertices[type]["data"]
 
     def edge_data(self, type=None):
         """Edge data getter
@@ -179,9 +193,9 @@ class DirectedGraph(Graph):
             Otherwise, you'll get a dict of the following format {'vertex_type_1': data_tensor, ...}
         """
         if type is None:
-            return {k: v['data'] for k, v in self._edges.items()}
+            return {k: v["data"] for k, v in self._edges.items()}
         else:
-            return self._edges[type]['data']
+            return self._edges[type]["data"]
 
     def set_edge_data(self, data, type=None):
         """Edge data setter
@@ -197,10 +211,10 @@ class DirectedGraph(Graph):
         if not isinstance(data, dict):
             if type is None:
                 type = self.default_edge_type
-            self._edges[type]['data'] = data
+            self._edges[type]["data"] = data
         else:
             for type, d in data.items():
-                self._edges[type]['data'] = d
+                self._edges[type]["data"] = d
 
     def set_vertex_data(self, data, type=None):
         """Vertex data setter
@@ -216,10 +230,10 @@ class DirectedGraph(Graph):
         if not isinstance(data, dict):
             if type is None:
                 type = self.default_vertex_type
-            self._vertices[type]['data'] = data
+            self._vertices[type]["data"] = data
         else:
             for type, d in data.items():
-                self._vertices[type]['data'] = d
+                self._vertices[type]["data"] = d
 
     def vertex_info(self, type=None):
         """Vertex info getter.
@@ -235,9 +249,9 @@ class DirectedGraph(Graph):
             Otherwise, you will get a dict of lists for the vertices of all types.
         """
         if type is None:
-            return {k: v['info'] for k, v in self._vertices.items()}
+            return {k: v["info"] for k, v in self._vertices.items()}
         else:
-            return self._vertices[type]['info']
+            return self._vertices[type]["info"]
 
     def edge_info(self, type=None):
         """Edge info getter.
@@ -253,9 +267,9 @@ class DirectedGraph(Graph):
             Otherwise, you will get a dict of lists for the edges of all types.
         """
         if type is None:
-            return {k: v['info'] for k, v in self._edges.items()}
+            return {k: v["info"] for k, v in self._edges.items()}
         else:
-            return self._edges[type]['info']
+            return self._edges[type]["info"]
 
     @property
     def edge_types(self):
@@ -287,9 +301,9 @@ class DirectedGraph(Graph):
         edge_type = self.default_edge_type if edge_type is None else edge_type
 
         if id is None:
-            return [el.sender for el in self._edges[edge_type]['info']]
+            return [el.sender for el in self._edges[edge_type]["info"]]
         else:
-            return self._edges[edge_type]['info'][id].sender
+            return self._edges[edge_type]["info"][id].sender
 
     def receivers(self, id=None, edge_type=None):
         """Get the receiver of a particular edge of a particular type
@@ -311,9 +325,9 @@ class DirectedGraph(Graph):
         edge_type = self.default_edge_type if edge_type is None else edge_type
 
         if id is None:
-            return [el.receiver for el in self._edges[edge_type]['info']]
+            return [el.receiver for el in self._edges[edge_type]["info"]]
         else:
-            return self._edges[edge_type]['info'][id].receiver
+            return self._edges[edge_type]["info"][id].receiver
 
     def incoming_edges(self, vid, vertex_type, edge_type, ids_only=False):
         """Get all the incoming edges of a vertex
@@ -336,7 +350,7 @@ class DirectedGraph(Graph):
                 based on the ids_only parameter, either list of ints or list of objests of type Entity
         """
 
-        res = self._vertices[vertex_type]['info'][vid].incoming_edges[edge_type]
+        res = self._vertices[vertex_type]["info"][vid].incoming_edges[edge_type]
         if ids_only:
             return [el.id for el in res]
         return res
@@ -362,7 +376,7 @@ class DirectedGraph(Graph):
                 based on the ids_only parameter, either list of ints or list of objests of type Entity
         """
 
-        res = self._vertices[vertex_type]['info'][vid].outgoing_edges[edge_type]
+        res = self._vertices[vertex_type]["info"][vid].outgoing_edges[edge_type]
         if ids_only:
             return [el.id for el in res]
         return res
@@ -372,7 +386,9 @@ class DirectedGraph(Graph):
         """Will return the vertex type if the number of vertex types is 1, otherwise will throw an error."""
 
         if len(self._vertices.keys()) > 1:
-            raise ValueError("I have more than one vertex type, you need to provide a type to get the data")
+            raise ValueError(
+                "I have more than one vertex type, you need to provide a type to get the data"
+            )
         return next(iter(self._vertices.keys()))
 
     @property
@@ -380,36 +396,44 @@ class DirectedGraph(Graph):
         """Will return the edge type if the number of edge types is 1, otherwise will throw an error."""
 
         if len(self._edges.keys()) > 1:
-            raise ValueError("I have more than one edge type, you need to provide a type to get the data")
+            raise ValueError(
+                "I have more than one edge type, you need to provide a type to get the data"
+            )
         return next(iter(self._edges.keys()))
 
     def _graph_summary(self):
         """Prints summary of a graph. Perfect for debugging purposes. Probably should be moved to the utils."""
 
-        print('Graph summary')
-        print('-------------')
+        print("Graph summary")
+        print("-------------")
 
         for vt in self.vertex_types:
             print("Vertices of type '%s'" % vt)
-            for vid, vinfo in enumerate(self._vertices[vt]['info']):
-                print("Vertex with id: %d, data: %s, incoming edges ids: %s, outcoming edges ids: %s, type: %s." %
-                      (vid,
-                       str(self._vertices[vt]['data'][vid]),
-                       [el.id for el in self.incoming_edges(vid, vinfo.type, 'edge')],
-                       [el.id for el in self.outgoing_edges(vid, vinfo.type, 'edge')],
-                       vinfo.type)
-                      )
+            for vid, vinfo in enumerate(self._vertices[vt]["info"]):
+                print(
+                    "Vertex with id: %d, data: %s, incoming edges ids: %s, outcoming edges ids: %s, type: %s."
+                    % (
+                        vid,
+                        str(self._vertices[vt]["data"][vid]),
+                        [el.id for el in self.incoming_edges(vid, vinfo.type, "edge")],
+                        [el.id for el in self.outgoing_edges(vid, vinfo.type, "edge")],
+                        vinfo.type,
+                    )
+                )
 
         for et in self.edge_types:
             print("Edges of type '%s'" % et)
-            for eid, einfo in enumerate(self._edges[et]['info']):
-                print("Edge with id: %d, data: %s, sender id: %d, receiver id: %d, type: %s." %
-                      (eid,
-                       str(self._edges[et]['data'][eid]),
-                       einfo.sender.id,
-                       einfo.receiver.id,
-                       einfo.type)
-                      )
+            for eid, einfo in enumerate(self._edges[et]["info"]):
+                print(
+                    "Edge with id: %d, data: %s, sender id: %d, receiver id: %d, type: %s."
+                    % (
+                        eid,
+                        str(self._edges[et]["data"][eid]),
+                        einfo.sender.id,
+                        einfo.receiver.id,
+                        einfo.type,
+                    )
+                )
 
     def get_entities(self, zero_data=False):
         """Get dict of entities (see top of the current file for a description of the data structure
@@ -424,23 +448,23 @@ class DirectedGraph(Graph):
             Dict of entities with the data or not.
         """
 
-        entities = {'vertex': {}, 'edge': {}, 'metadata': self._metadata}
+        entities = {"vertex": {}, "edge": {}, "metadata": self._metadata}
 
         for vtype, vdata in self._vertices.items():
-            vdict = {'info': vdata['info']}
+            vdict = {"info": vdata["info"]}
             if zero_data:
-                vdict['data'] = None
+                vdict["data"] = None
             else:
-                vdict['data'] = vdata['data']
-            entities['vertex'][vtype] = vdict
+                vdict["data"] = vdata["data"]
+            entities["vertex"][vtype] = vdict
 
         for etype, edata in self._edges.items():
-            edict = {'info': edata['info']}
+            edict = {"info": edata["info"]}
             if zero_data:
-                edict['data'] = None
+                edict["data"] = None
             else:
-                edict['data'] = edata['data']
-            entities['edge'][etype] = edict
+                edict["data"] = edata["data"]
+            entities["edge"][etype] = edict
         return entities
 
     def get_graph_with_same_topology(self):
@@ -480,10 +504,14 @@ class DirectedGraph(Graph):
             res = topology
 
         for t in res.vertex_types:
-            res._vertices[t]['data'] = torch.cat([g._vertices[t]['data'] for g in graph_list], dim=1)
+            res._vertices[t]["data"] = torch.cat(
+                [g._vertices[t]["data"] for g in graph_list], dim=1
+            )
 
         for t in res.edge_types:
-            res._edges[t]['data'] = torch.cat([g._edges[t]['data'] for g in graph_list], dim=1)
+            res._edges[t]["data"] = torch.cat(
+                [g._edges[t]["data"] for g in graph_list], dim=1
+            )
 
         return res
 
@@ -500,10 +528,10 @@ class DirectedGraph(Graph):
 
         """
         for v in self._vertices.values():
-            v['data'] = v['data'].to(device)
+            v["data"] = v["data"].to(device)
 
         for e in self._edges.values():
-            e['data'] = e['data'].to(device)
+            e["data"] = e["data"].to(device)
 
     def set_data(self, vertex_data=None, edge_data=None):
         """ replace graph data
@@ -547,7 +575,7 @@ class DirectedGraphWithContext(DirectedGraph):
         """
 
         super().__init__(entities)
-        self._context = {k: v.copy() for k, v in entities['context'].items()}
+        self._context = {k: v.copy() for k, v in entities["context"].items()}
 
     @property
     def context(self):
@@ -562,7 +590,6 @@ class DirectedGraphWithContext(DirectedGraph):
         """
 
         return self._context
-
 
     @classmethod
     def concat(cls, graph_list, topology=None):
@@ -586,13 +613,19 @@ class DirectedGraphWithContext(DirectedGraph):
             res = topology
 
         for t in res.vertex_types:
-            res._vertices[t]['data'] = torch.cat([g._vertices[t]['data'] for g in graph_list], dim=1)
+            res._vertices[t]["data"] = torch.cat(
+                [g._vertices[t]["data"] for g in graph_list], dim=1
+            )
 
         for t in res.edge_types:
-            res._edges[t]['data'] = torch.cat([g._edges[t]['data'] for g in graph_list], dim=1)
+            res._edges[t]["data"] = torch.cat(
+                [g._edges[t]["data"] for g in graph_list], dim=1
+            )
 
         for t in res._context:
-            res._context[t]['data'] = torch.cat([g._context[t]['data'] for g in graph_list], dim=1)
+            res._context[t]["data"] = torch.cat(
+                [g._context[t]["data"] for g in graph_list], dim=1
+            )
 
         return res
 
@@ -614,11 +647,11 @@ class DirectedGraphWithContext(DirectedGraph):
         if type is None:
             if concat:
                 # TODO this was never tested with several types of context variables
-                return torch.cat([v['data'] for v in self._context.values()]).squeeze()
+                return torch.cat([v["data"] for v in self._context.values()]).squeeze()
             else:
-                return {k: v['data'] for k, v in self._context.items()}
+                return {k: v["data"] for k, v in self._context.items()}
         else:
-            return self._context[type]['data']
+            return self._context[type]["data"]
 
     def set_context_data(self, data, type=None):
         """context data setter
@@ -641,20 +674,20 @@ class DirectedGraphWithContext(DirectedGraph):
         if not isinstance(data, dict):
             if type is None:
                 type = self.default_context_type
-            self._context[type]['data'] = data
+            self._context[type]["data"] = data
         else:
             for type, d in data.items():
-                self._context[type]['data'] = d
+                self._context[type]["data"] = d
 
     def get_entities(self, zero_data=False):
         """Get all the entities. Same as in parent class, but also returns the context."""
 
         entities = super().get_entities(zero_data)
-        entities['context'] = {}
+        entities["context"] = {}
         for ctype, cdata in self._context.items():
-            entities['context'][ctype] = {
-                'data': cdata['data'] if not zero_data else None,
-                'info': cdata['info']
+            entities["context"][ctype] = {
+                "data": cdata["data"] if not zero_data else None,
+                "info": cdata["info"],
             }
         return entities
 
@@ -669,7 +702,9 @@ class DirectedGraphWithContext(DirectedGraph):
         """Return the context type key if it is unique, otherwise throw a ValueError"""
 
         if len(self._context.keys()) > 1:
-            raise ValueError("I have more than one vertex type, you need to provide a type to get the data")
+            raise ValueError(
+                "I have more than one vertex type, you need to provide a type to get the data"
+            )
         return next(iter(self._context.keys()))
 
     def to(self, device):
@@ -678,7 +713,7 @@ class DirectedGraphWithContext(DirectedGraph):
         super().to(device)
 
         for c in self._context.values():
-            c['data'] = c['data'].to(device)
+            c["data"] = c["data"].to(device)
 
     def set_data(self, vertex_data=None, edge_data=None, context_data=None):
         """Data setter, same as in parent class, but with context"""
