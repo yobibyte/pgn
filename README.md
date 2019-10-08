@@ -11,6 +11,11 @@ Run `python3 sort.py` in the `examples' folder to run a sorting toy-task. You sh
 
 ![sorting example](pics/pgn_sorting_output.png)
 
+## TODOs
+
+* [ ] Update documentation.
+* [ ] Add other examples, e.g. TSP.
+
 ## Acknowledgements
 
 * [Wendelin Boehmer](https://whirl.cs.ox.ac.uk/member/wendelin-boehmer/) for useful discussions and trying it out.
