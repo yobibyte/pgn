@@ -64,12 +64,15 @@ class NodeBlock(Block):
 
         Parameters
         ----------
-        Gs: pgn.graph.Graph or list of them
-            input data
+        vdata: vertex data of the input graph
+        edata: edge data of the input graph
+        connectivity:
+            torch.Tensor of shape 2,* where first row is edge senders, and the second row is edge receivers
+        cdata: global attribute of the input graph
 
         Returns
         -------
-            list of dicts with data tensors
+            output torch.Tensor
         """
         # TODO check all the dims
         if self._independent:
@@ -123,8 +126,12 @@ class EdgeBlock(Block):
 
         Parameters
         ----------
-        Gs: pgn.graph.Graph or list of them
-            input data
+        vdata: vertex data of the input graph
+        edata: edge data of the input graph
+        connectivity:
+            torch.Tensor of shape 2,* where first row is edge senders, and the second row is edge receivers
+        cdata: global attribute of the input graph
+
 
         Returns
         -------
@@ -178,7 +185,8 @@ class GlobalBlock(Block):
             one aggregator per type, if an aggregator is absent for a type, it will not be aggregated
         edge_aggregators: dict
             one aggregator per type, if an aggregator is absent for a type, it will not be aggregated
-
+        device: torch.device
+            Where should we keep the data? 'cpu' by default
         """
         super().__init__(
             (vertex_aggregator is None) and (edge_aggregators == {}), device=device
@@ -206,12 +214,14 @@ class GlobalBlock(Block):
 
         Parameters
         ----------
-        Gs: pgn.graph.Graph or list of them
-            input data
+        cdata: global attribute of the input graph
+        vdata: vertex data of the input graph
+        edata: edge data of the input graph
+        metadata: dict
 
         Returns
         -------
-            list of dicts with data tensors
+            output torch.Tensor
         """
 
         if self._independent:
