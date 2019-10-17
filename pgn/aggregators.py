@@ -4,13 +4,8 @@ import torch
 
 """Module to keep all the aggregation functions
 
-Aggregation is batched within one graph only. 
-I am not sure that batching along batch dimension (for different graphs) 
-is better here. I tried that and padding took a lot of time. 
-Moreover, I had to do splitting which made backward step muuuuuch slower.
- 
+Aggregation works with multiple graphs now when graphs are batched into a bunch of disconnected subgraphs. 
 """
-
 
 class Aggregator(nn.Module):
     """
@@ -56,7 +51,6 @@ class MeanAggregator(Aggregator):
         """
 
         return scatter_mean(x, indices, dim=dim, dim_size=dim_size)
-
 
 class NonScatterMeanAggregator(Aggregator):
     """Average along the 0-th dimension (per entity)"""

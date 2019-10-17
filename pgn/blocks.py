@@ -1,5 +1,3 @@
-import numpy as np
-import pgn.graph as pg
 import torch
 import torch.nn as nn
 

@@ -1,4 +1,3 @@
-import pgn.graph as pg
 import torch.nn as nn
 from pgn.aggregators import MeanAggregator, NonScatterMeanAggregator
 from pgn.blocks import (
@@ -141,7 +140,6 @@ class EncoderCoreDecoder(nn.Module):
         core_global_shape=(None, None),
         dec_global_shape=(None, None),
         out_global_size=None,
-        input_type=pg.DirectedGraphWithContext,
         device=torch.device("cpu"),
     ):
         """
@@ -178,14 +176,10 @@ class EncoderCoreDecoder(nn.Module):
             (in_dim, hidden units #1, #2, ...)
         out_global_size: int
             Dimensionality of the G' global attribute.
-        input_type: pgn.Graph
-            Before input data is fed to the network it is converted to the pgn.Graph class
-            to provide api for graph methods. Which graph do you have? pgn.graph.DirectedGraphWithContext by default.
         """
 
         super().__init__()
         self._device = device
-        self._input_type = input_type
 
         self._core_steps = core_steps
         enc_node_updater, enc_edge_updater, enc_global_updater = get_mlp_updaters(
