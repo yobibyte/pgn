@@ -23,4 +23,6 @@ Run `python3 sort.py` in the `examples' folder to run a sorting toy-task. You sh
 
 ## Disclaimer
 
-This works with `python3` only.
+This library is highly experimental and designed for educational purposes. For me it was a way to understand Graph Networks.
+
+`pgn` works with `python3` only.

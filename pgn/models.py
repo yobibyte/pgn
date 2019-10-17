@@ -189,7 +189,7 @@ class EncoderCoreDecoder(nn.Module):
         self.encoder = IndependentGraphNetwork(
             NodeBlock(enc_node_updater, device=device),
             EdgeBlock({"default": enc_edge_updater}, independent=True, device=device),
-        )  # GlobalBlock(enc_global_updater, device=device) if enc_global_updater else None)
+            GlobalBlock(enc_global_updater, device=device) if enc_global_updater else None)
 
         core_node_updater, core_edge_updater, core_global_updater = get_mlp_updaters(
             *core_vertex_shape, *core_edge_shape, *core_global_shape, independent=False
@@ -198,8 +198,10 @@ class EncoderCoreDecoder(nn.Module):
         self.core = GraphNetwork(
             NodeBlock(core_node_updater, {"default": MeanAggregator()}, device=device),
             EdgeBlock({"default": core_edge_updater}, device=device),
-            # GlobalBlock(core_global_updater, MeanAggregator(),
-            #            {'default': MeanAggregator()}, device=device) if core_global_updater else None)
+            None if core_global_updater is None else GlobalBlock(core_global_updater,
+                                                                 vertex_aggregator={'default': MeanAggregator()},
+                                                                 edge_aggregator={'default': MeanAggregator()},
+                                                                 device=device)
         )
         dec_node_updater, dec_edge_updater, dec_global_updater = get_mlp_updaters(
             *dec_vertex_shape, *dec_edge_shape, *dec_global_shape, independent=True
@@ -220,8 +222,7 @@ class EncoderCoreDecoder(nn.Module):
                 independent=True,
                 device=device,
             ),
-            # GlobalBlock(nn.Sequential(dec_global_updater, nn.Linear(dec_global_shape[-1],
-            #                                                                    out_global_size)), device=device) if dec_global_updater else None,
+            GlobalBlock(nn.Sequential(dec_global_updater, nn.Linear(dec_global_shape[-1], out_global_size)), device=device) if dec_global_updater else None,
         )
 
     def forward(

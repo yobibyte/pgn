@@ -134,7 +134,7 @@ class EdgeBlock(Block):
         if self._independent:
             return {et: self._updaters[et](ed) for et, ed in edata.items()}
         else:
-            # TODO implemente context cdata = [g.context_data(concat=True) for g in Gs] if isinstance(Gs[0],
+            # TODO implement context cdata = [g.context_data(concat=True) for g in Gs] if isinstance(Gs[0],
             #                                                                pg.DirectedGraphWithContext) else None
             out = {}
             for et in edata:
