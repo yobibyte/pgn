@@ -20,3 +20,7 @@ Run `python3 sort.py` in the `examples' folder to run a sorting toy-task. You sh
 
 * [Wendelin Boehmer](https://whirl.cs.ox.ac.uk/member/wendelin-boehmer/) for useful discussions and trying it out.
 * [Matthias Fey](https://github.com/rusty1s) for his great pytorch-scatter library.
+
+## Disclaimer
+
+This works with `python3` only.
