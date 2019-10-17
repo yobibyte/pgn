@@ -2,7 +2,6 @@ import networkx as nx
 import torch
 import numpy as np
 from networkx.drawing.nx_agraph import to_agraph
-from pgn.graph import DirectedGraph
 
 # TODO this, probably, should go to the pymarl code
 EDGE_COLOURS = {"edge": "black", "action": "black", "relation": "orange"}
@@ -17,6 +16,17 @@ LAYOUTS = [
 
 
 def batch_data(graph_list):
+    """
+    Batch multiple graphs into one huge graph consisting of disconnected subgraphs.
+    Parameters
+    ----------
+    graph_list: list
+    List of graph tuples.
+
+    Returns a graph tuple and its metadata
+    -------
+
+    """
     vdata = [el[0] for el in graph_list]
     edata = [el[1] for el in graph_list]
     connectivity = [el[2] for el in graph_list]
@@ -45,7 +55,7 @@ def batch_data(graph_list):
         correction = torch.cat(
             [
                 torch.zeros(esizes[et][0], dtype=torch.long, device=vdata.device),
-                [
+                *[
                     torch.tensor(
                         [el] * esizes[et][i], dtype=torch.long, device=vdata.device
                     )
@@ -59,6 +69,8 @@ def batch_data(graph_list):
 
 
 def pgn2nx(ig):
+    # TODO this is broken after refactoring. Needs moving everything from classes to tuples.
+
     """
 
     Parameters
@@ -138,6 +150,19 @@ def plot_graph(g, fname="graph.pdf"):
 
 
 def concat_entities(entities):
+    """
+    Concat multiple graphs via concatenation of their entities tensors.
+
+    Parameters
+    ----------
+    entities: a list of graph tuples.
+        Either [(v,e,c),...] or [(v,e),...] when the graph has no global attribute.
+    Returns v,e,c - concatenated entities tensors, None for c if no global in the graph.
+    -------
+
+    """
+
+
     has_global = len(entities[0]) == 3 and entities[0][2] is not None
 
     v = torch.cat([el[0] for el in entities], dim=1)
