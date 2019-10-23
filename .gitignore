@@ -6,3 +6,4 @@ examples/*.png
 Dockerfile
 .gitignore
 docker_run.sh
+docker_build.sh
