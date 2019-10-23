@@ -140,9 +140,6 @@ def batch_loss(outs, targets, criterion, batch_size, core_steps):
     vsize = targets[0].shape[0] // batch_size
     esize = targets[1].shape[0] // batch_size
     for out in outs:
-        # this loss will encourage the model to uniformly everywhere, need to take the mean per graph
-        # loss += criterion(out[0], targets[0])
-        # loss += criterion(out[1]['default'], targets[1])]
         for i in range(batch_size):
             loss += criterion(
                 out[0][i * vsize : (i + 1) * vsize],
