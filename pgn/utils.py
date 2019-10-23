@@ -91,8 +91,8 @@ def pgn2nx(g):
                 label="id: {}, data: {}".format(e_id, e_data.numpy()))
 
     pos = nx.spring_layout(G)
-    for n in G.node:
-        G.node[n].update({"pos": pos[n]})
+    for n in G.nodes:
+        G.nodes[n].update({"pos": pos[n]})
     return G
 
 
