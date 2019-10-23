@@ -3,8 +3,6 @@ import torch
 import numpy as np
 from networkx.drawing.nx_agraph import to_agraph
 
-# TODO this, probably, should go to the pymarl code
-EDGE_COLOURS = {"edge": "black", "action": "black", "relation": "orange"}
 LAYOUTS = [
     "neato",
     "dot",
@@ -68,15 +66,14 @@ def batch_data(graph_list):
     return vdata, edata_d, connectivity_d, cdata, {"vsizes": vsizes, "esizes": esizes}
 
 
-def pgn2nx(ig):
+def pgn2nx(g):
     # TODO this is broken after refactoring. Needs moving everything from classes to tuples.
 
     """
 
     Parameters
     ----------
-    ig: dict
-        A dictionary of entities
+    g: A tuple (vdata, edata, connectivity)
 
     Returns
     -------
@@ -84,37 +81,16 @@ def pgn2nx(ig):
         A graph converted to the format networkx can plot.
     """
 
-    ig = DirectedGraph(ig)
+    vdata, edata, connectivity = g
     G = nx.MultiDiGraph()
-    for t, vinfo in ig.vertex_info().items():
-        for v in vinfo:
-            colour = (
-                "black"
-                if v.hidden_info is None or "colour" not in v.hidden_info
-                else v.hidden_info["colour"]
-            )
-            label = (
-                str(v.id)
-                if v.hidden_info is None or "label" not in v.hidden_info
-                else "v.id: {},\n".format(v.id)
-                + str(v.hidden_info)
-                + " "
-                + str(ig.vertex_data(t)[v.id])
-            )
-            G.add_node((v.type, v.id), color=colour, label=label)
+    for v_id, v_data in enumerate(vdata):
+            G.add_node((v_id), color="black", label="v.id: {},\n data: {}".format(v_id, v_data.numpy()))
 
-    for t, einfo in ig.edge_info().items():
-        for e in einfo:
-            colour = "black" if e.type not in EDGE_COLOURS else EDGE_COLOURS[e.type]
-            basic_info = "id: {}, data: {}".format(e.id, ig.edge_data(t)[e.id])
-            G.add_edge(
-                (e.sender.type, e.sender.id),
-                (e.receiver.type, e.receiver.id),
-                color=colour,
-                label=basic_info,
-            )
+    for e_id, e_data in enumerate(edata):
+            G.add_edge(connectivity[0][e_id].item(), connectivity[1][e_id].item(), color="black",
+                label="id: {}, data: {}".format(e_id, e_data.numpy()))
+
     pos = nx.spring_layout(G)
-
     for n in G.node:
         G.node[n].update({"pos": pos[n]})
     return G
@@ -132,13 +108,17 @@ def plot_graph(g, fname="graph.pdf"):
 
     Parameters
     ----------
-    g
-    fname
+    g: A tuple (vdata, edata, connectivity)
+        graph to plot
+    fname: string
+        filepath to save with
 
     Returns
     -------
 
     """
+
+    g = pgn2nx(g)
 
     g.graph["edge"] = {"arrowsize": "0.6", "splines": "curved"}
     g.graph["node"] = {"shape": "box"}
