@@ -10,8 +10,9 @@ from pgn.blocks import (
 import torch
 from pgn.utils import concat_entities
 
+DEFAULT_ACTIVATION = nn.ReLU
 
-def get_mlp(input_size, units, activation=nn.ReLU, layer_norm=True):
+def get_mlp(input_size, units, activation=None, layer_norm=True):
     """Helper to build multilayer perceptrons
 
     Important! Last layer is activated as well! And there is a LayerNorm after.
@@ -32,6 +33,10 @@ def get_mlp(input_size, units, activation=nn.ReLU, layer_norm=True):
     """
     arch = []
     inpt_size = input_size
+
+    if activation is None:
+        activation = DEFAULT_ACTIVATION
+
     for l in units:
         arch.append(nn.Linear(inpt_size, l))
         arch.append(activation())
@@ -49,6 +54,7 @@ def get_mlp_updaters(
     input_global_size=None,
     output_global_size=None,
     independent=False,
+    activation=None,
 ):
     """Helper to get updaters for a graph network given input/output parameters.
 
@@ -68,6 +74,8 @@ def get_mlp_updaters(
         Global feature dimensions of the output graph? If None, you will not get a Global updater in the output.
     independent: bool
         Whether a GraphNetwork is independent or not. See EncoderCoreDecoder docs for more information.
+    activation:
+        What is the activation to use?
     Returns
     -------
         node_updater, edge_updater, global_updater: nn.Module
@@ -85,10 +93,10 @@ def get_mlp_updaters(
         )
 
     if independent:
-        edge_updater = get_mlp(input_edge_size, [16, output_edge_size])
-        node_updater = get_mlp(input_node_size, [16, output_node_size])
+        edge_updater = get_mlp(input_edge_size, [16, output_edge_size], activation=activation)
+        node_updater = get_mlp(input_node_size, [16, output_node_size], activation=activation)
         global_updater = (
-            get_mlp(input_global_size, [16, output_global_size])
+            get_mlp(input_global_size, [16, output_global_size], activation=activation)
             if with_global
             else None
         )
@@ -97,16 +105,16 @@ def get_mlp_updaters(
             input_global_size = output_global_size = 0
         edge_updater = get_mlp(
             input_edge_size + 2 * input_node_size + input_global_size,
-            [16, output_edge_size],
+            [16, output_edge_size], activation=activation
         )
         node_updater = get_mlp(
             input_node_size + output_edge_size + input_global_size,
-            [16, output_node_size],
+            [16, output_node_size], activation=activation
         )
         global_updater = (
             get_mlp(
                 input_global_size + output_edge_size + output_node_size,
-                [16, output_global_size],
+                [16, output_global_size], activation=activation
             )
             if with_global
             else None
@@ -141,6 +149,7 @@ class EncoderCoreDecoder(nn.Module):
         dec_global_shape=(None, None),
         out_global_size=None,
         device=torch.device("cpu"),
+        activation=None,
     ):
         """
         TODO this should be made easier for the user. It is very easy to mess up the shape and spend half a day on
@@ -183,7 +192,7 @@ class EncoderCoreDecoder(nn.Module):
 
         self._core_steps = core_steps
         enc_node_updater, enc_edge_updater, enc_global_updater = get_mlp_updaters(
-            *enc_vertex_shape, *enc_edge_shape, *enc_global_shape, independent=True
+            *enc_vertex_shape, *enc_edge_shape, *enc_global_shape, independent=True, activation=activation
         )
 
         self.encoder = IndependentGraphNetwork(
@@ -192,7 +201,7 @@ class EncoderCoreDecoder(nn.Module):
             GlobalBlock(enc_global_updater, device=device) if enc_global_updater else None)
 
         core_node_updater, core_edge_updater, core_global_updater = get_mlp_updaters(
-            *core_vertex_shape, *core_edge_shape, *core_global_shape, independent=False
+            *core_vertex_shape, *core_edge_shape, *core_global_shape, independent=False, activation=activation
         )
 
         self.core = GraphNetwork(
@@ -204,7 +213,7 @@ class EncoderCoreDecoder(nn.Module):
                                                                  device=device)
         )
         dec_node_updater, dec_edge_updater, dec_global_updater = get_mlp_updaters(
-            *dec_vertex_shape, *dec_edge_shape, *dec_global_shape, independent=True
+            *dec_vertex_shape, *dec_edge_shape, *dec_global_shape, independent=True, activation=activation
         )
         self.decoder = IndependentGraphNetwork(
             NodeBlock(
