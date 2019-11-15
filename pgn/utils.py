@@ -55,7 +55,7 @@ def batch_data(graph_list):
                 torch.zeros(esizes[et][0], dtype=torch.long, device=vdata.device),
                 *[
                     torch.tensor(
-                        [el] * esizes[et][i], dtype=torch.long, device=vdata.device
+                        [el] * esizes[et][i+1], dtype=torch.long, device=vdata.device
                     )
                     for i, el in enumerate(vcumsum[:-1])
                 ],
