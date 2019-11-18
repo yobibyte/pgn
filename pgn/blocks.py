@@ -260,9 +260,10 @@ class GraphNetwork(nn.Module):
     def forward(self, vdata, edata, connectivity, context=None, metadata=None):
         # make one pass as in the original paper
         # 1. Compute updated edge attributes
-        eout = None
-        vout = None
-        cout = None
+        # if there is no corresponding updater, keep labels unchanged
+        eout = edata
+        vout = vdata
+        cout = context
         if self._edge_block is not None:
             cdata = None
             if context is not None:
