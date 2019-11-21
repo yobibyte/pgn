@@ -12,7 +12,8 @@ from pgn.utils import concat_entities
 
 DEFAULT_ACTIVATION = nn.ReLU
 
-def get_mlp(input_size, units, activation=None, layer_norm=True):
+
+def get_mlp(input_size, units, activation=None, layer_norm=True, init=None):
     """Helper to build multilayer perceptrons
 
     Important! Last layer is activated as well! And there is a LayerNorm after.
@@ -25,6 +26,8 @@ def get_mlp(input_size, units, activation=None, layer_norm=True):
         How many units in hidden layers do you want?
     activation:
         What is the activation to use?
+    init:
+        lambda to init the parameters
 
     Returns
     -------
@@ -38,7 +41,10 @@ def get_mlp(input_size, units, activation=None, layer_norm=True):
         activation = DEFAULT_ACTIVATION
 
     for l in units:
-        arch.append(nn.Linear(inpt_size, l))
+        preact = nn.Linear(inpt_size, l)
+        if init is not None:
+            preact = init(preact)
+        arch.append(preact)
         arch.append(activation())
         inpt_size = l
     if layer_norm:
@@ -55,6 +61,7 @@ def get_mlp_updaters(
     output_global_size=None,
     independent=False,
     activation=None,
+    init=None,
 ):
     """Helper to get updaters for a graph network given input/output parameters.
 
@@ -76,6 +83,8 @@ def get_mlp_updaters(
         Whether a GraphNetwork is independent or not. See EncoderCoreDecoder docs for more information.
     activation:
         What is the activation to use?
+    init:
+        lambda to initialise the params 
     Returns
     -------
         node_updater, edge_updater, global_updater: nn.Module
@@ -93,10 +102,19 @@ def get_mlp_updaters(
         )
 
     if independent:
-        edge_updater = get_mlp(input_edge_size, [16, output_edge_size], activation=activation)
-        node_updater = get_mlp(input_node_size, [16, output_node_size], activation=activation)
+        edge_updater = get_mlp(
+            input_edge_size, [16, output_edge_size], activation=activation, init=init
+        )
+        node_updater = get_mlp(
+            input_node_size, [16, output_node_size], activation=activation, init=init
+        )
         global_updater = (
-            get_mlp(input_global_size, [16, output_global_size], activation=activation)
+            get_mlp(
+                input_global_size,
+                [16, output_global_size],
+                activation=activation,
+                init=init,
+            )
             if with_global
             else None
         )
@@ -105,16 +123,22 @@ def get_mlp_updaters(
             input_global_size = output_global_size = 0
         edge_updater = get_mlp(
             input_edge_size + 2 * input_node_size + input_global_size,
-            [16, output_edge_size], activation=activation
+            [16, output_edge_size],
+            activation=activation,
+            init=init,
         )
         node_updater = get_mlp(
             input_node_size + output_edge_size + input_global_size,
-            [16, output_node_size], activation=activation
+            [16, output_node_size],
+            activation=activation,
+            init=init,
         )
         global_updater = (
             get_mlp(
                 input_global_size + output_edge_size + output_node_size,
-                [16, output_global_size], activation=activation
+                [16, output_global_size],
+                activation=activation,
+                init=init,
             )
             if with_global
             else None
@@ -192,28 +216,47 @@ class EncoderCoreDecoder(nn.Module):
 
         self._core_steps = core_steps
         enc_node_updater, enc_edge_updater, enc_global_updater = get_mlp_updaters(
-            *enc_vertex_shape, *enc_edge_shape, *enc_global_shape, independent=True, activation=activation
+            *enc_vertex_shape,
+            *enc_edge_shape,
+            *enc_global_shape,
+            independent=True,
+            activation=activation
         )
 
         self.encoder = IndependentGraphNetwork(
             NodeBlock(enc_node_updater, device=device),
             EdgeBlock({"default": enc_edge_updater}, independent=True, device=device),
-            GlobalBlock(enc_global_updater, device=device) if enc_global_updater else None)
+            GlobalBlock(enc_global_updater, device=device)
+            if enc_global_updater
+            else None,
+        )
 
         core_node_updater, core_edge_updater, core_global_updater = get_mlp_updaters(
-            *core_vertex_shape, *core_edge_shape, *core_global_shape, independent=False, activation=activation
+            *core_vertex_shape,
+            *core_edge_shape,
+            *core_global_shape,
+            independent=False,
+            activation=activation
         )
 
         self.core = GraphNetwork(
             NodeBlock(core_node_updater, {"default": MeanAggregator()}, device=device),
             EdgeBlock({"default": core_edge_updater}, device=device),
-            None if core_global_updater is None else GlobalBlock(core_global_updater,
-                                                                 vertex_aggregator={'default': MeanAggregator()},
-                                                                 edge_aggregator={'default': MeanAggregator()},
-                                                                 device=device)
+            None
+            if core_global_updater is None
+            else GlobalBlock(
+                core_global_updater,
+                vertex_aggregator={"default": MeanAggregator()},
+                edge_aggregator={"default": MeanAggregator()},
+                device=device,
+            ),
         )
         dec_node_updater, dec_edge_updater, dec_global_updater = get_mlp_updaters(
-            *dec_vertex_shape, *dec_edge_shape, *dec_global_shape, independent=True, activation=activation
+            *dec_vertex_shape,
+            *dec_edge_shape,
+            *dec_global_shape,
+            independent=True,
+            activation=activation
         )
         self.decoder = IndependentGraphNetwork(
             NodeBlock(
@@ -231,7 +274,14 @@ class EncoderCoreDecoder(nn.Module):
                 independent=True,
                 device=device,
             ),
-            GlobalBlock(nn.Sequential(dec_global_updater, nn.Linear(dec_global_shape[-1], out_global_size)), device=device) if dec_global_updater else None,
+            GlobalBlock(
+                nn.Sequential(
+                    dec_global_updater, nn.Linear(dec_global_shape[-1], out_global_size)
+                ),
+                device=device,
+            )
+            if dec_global_updater
+            else None,
         )
 
     def forward(
